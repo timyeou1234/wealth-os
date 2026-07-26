@@ -1,0 +1,45 @@
+name: Architecture decision
+description: Explore a consequential technical decision before implementation
+title: "architecture: "
+labels: []
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What forces, constraints, and product requirements drive this decision?
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision to make
+      description: State the decision boundary without assuming the answer.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options and tradeoffs
+      description: Compare viable alternatives, including operational and security costs.
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Expected consequences
+      description: Capture positive, negative, and uncertain effects.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: What evidence, prototype, or measurement would reduce uncertainty?
+  - type: checkboxes
+    id: adr
+    attributes:
+      label: Documentation
+      options:
+        - label: This decision will be recorded or superseded in an ADR.
+          required: true

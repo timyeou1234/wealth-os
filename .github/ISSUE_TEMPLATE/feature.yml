@@ -1,0 +1,58 @@
+name: Product capability
+description: Propose a capability that solves a verified user problem
+title: "feat: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the problem and outcome. Architecture and implementation follow.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who has this problem, in what context, and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the observable user outcome without prescribing a solution.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and assumptions
+      description: What evidence supports this work, and which assumptions need validation?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: List what is included and explicitly excluded.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use testable, outcome-oriented criteria.
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: Design considerations
+      description: Note API, data, domain, security, privacy, and migration implications.
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Success signal
+      description: How will we know this capability improved the product?
+    validations:
+      required: true
