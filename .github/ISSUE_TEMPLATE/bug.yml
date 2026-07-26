@@ -1,0 +1,46 @@
+name: Bug report
+description: Report incorrect or unsafe Wealth OS behavior
+title: "fix: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never include credentials or real personal financial data. Follow SECURITY.md
+        for vulnerabilities.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use synthetic or redacted data only.
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - Incorrect financial calculation or data integrity
+        - Security or privacy concern
+        - Feature unavailable
+        - Visual or usability issue
+        - Developer experience
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include environment details and sanitized logs where useful.

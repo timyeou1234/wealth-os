@@ -1,0 +1,40 @@
+# Operating systems and editors
+.DS_Store
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# JavaScript / Next.js
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Kotlin / Gradle / JVM
+.gradle/
+build/
+out/
+*.class
+*.jar
+!gradle-wrapper.jar
+
+# Logs and temporary files
+*.log
+tmp/
+.cache/
+
+# Test and tool output
+test-results/
+playwright-report/
+
+# Local infrastructure data
+.docker-data/
