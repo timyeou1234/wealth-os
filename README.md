@@ -101,6 +101,16 @@ Idea → Product discussion → GitHub issue → Architecture discussion (when n
 Use [Conventional Commits](https://www.conventionalcommits.org/), keep pull requests
 small, and link each pull request to its issue. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+### API build
+
+The Kotlin API uses the committed Gradle Wrapper and a Java 21 toolchain. A global
+Gradle installation is neither required nor supported as the project build contract.
+
+```bash
+./gradlew :apps:api:test
+./gradlew :apps:api:build
+```
+
 ## Project status
 
 Wealth OS is in its documentation and repository-bootstrap phase. Production
