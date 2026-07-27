@@ -16,7 +16,32 @@ Do not write production code without a corresponding issue.
 
 ## Branches and commits
 
-Create a focused branch from `main`. Use Conventional Commits:
+Create a focused branch from the latest `main`.
+
+Name branches using:
+
+```text
+<type>/<issue-number>-<short-description>
+```
+
+Use a lowercase Conventional Commit type, the corresponding GitHub Issue number, and
+a concise kebab-case description:
+
+```text
+feat/8-financial-health-engine
+fix/18-core-domain-main
+docs/12-architecture-decisions
+chore/15-api-gradle-skeleton
+ci/19-required-build-check
+refactor/24-snapshot-boundaries
+test/25-money-edge-cases
+```
+
+Supported types are `feat`, `fix`, `docs`, `chore`, `ci`, `refactor`, and `test`.
+Describe why the branch exists rather than who or which tool created it. Do not add
+author or agent prefixes.
+
+Use Conventional Commits:
 
 ```text
 feat(api): add asset endpoint
@@ -40,6 +65,23 @@ one change unless they cannot reasonably be separated.
 
 At least one reviewer should be able to understand the change without reconstructing
 unstated decisions from code.
+
+## Instructions for AI contributors
+
+This file is the canonical source for contribution workflow and engineering rules.
+Tool-specific instruction files must point contributors here rather than maintain
+independent copies of the same policy.
+
+Before changing the repository, AI contributors must:
+
+1. Read this file.
+2. Read the relevant product, architecture, and ADR documentation.
+3. Confirm the corresponding GitHub Issue and its acceptance criteria.
+4. Keep the change within the Issue and pull request scope.
+5. Explain and document consequential design decisions before implementation.
+
+Repository entrypoints exist for tools that automatically discover `AGENTS.md`,
+`CLAUDE.md`, `.github/copilot-instructions.md`, or `.cursor/rules/*.mdc`.
 
 ## Engineering expectations
 
