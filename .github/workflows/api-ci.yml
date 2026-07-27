@@ -2,27 +2,9 @@ name: API CI
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/api-ci.yml"
-      - "apps/api/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle.properties"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/api-ci.yml"
-      - "apps/api/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle.properties"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
 
 permissions:
   contents: read
