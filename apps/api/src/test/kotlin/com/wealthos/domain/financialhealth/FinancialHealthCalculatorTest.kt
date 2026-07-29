@@ -8,6 +8,7 @@ import com.wealthos.domain.asset.Liquidity
 import com.wealthos.domain.asset.ValuationSource
 import com.wealthos.domain.liability.LiabilityBalance
 import com.wealthos.domain.liability.LiabilityId
+import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.Snapshot
@@ -279,6 +280,7 @@ class FinancialHealthCalculatorTest {
             liabilityId = LiabilityId.new(),
             balance = money(amount, currency),
             effectiveAt = asOf,
+            source = LiabilitySource.of("manual"),
         )
 
     private fun money(

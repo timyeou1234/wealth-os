@@ -1,10 +1,11 @@
 # Wealth OS
 
-> A balance-sheet-first operating system for understanding and improving personal wealth.
+> A trustworthy historical personal balance sheet.
 
-Wealth OS is a modern personal wealth platform centered on the questions that matter over
-decades: What do I own? What do I owe? How is my net worth changing? Is my financial
-position becoming healthier?
+Wealth OS is a private, balance-sheet-first tool for periodically recording, reviewing,
+and understanding a person's material financial position over time. It centers on the
+questions that matter over decades: What do I own? What do I owe? What is my net worth?
+What changed since the last review?
 
 It is intentionally **not** a bookkeeping or budgeting application. Transactions and
 spending may eventually provide useful context, but the product's primary model is the
@@ -19,13 +20,13 @@ historical picture or make long-term decisions with confidence.
 Wealth OS aims to provide:
 
 - One coherent view of assets, liabilities, and net worth
-- Historical snapshots that explain how wealth changes over time
-- Signals about concentration, leverage, liquidity, and long-term financial health
+- Reproducible historical snapshots and basic comparisons between them
+- Objective views of leverage and immediate liquidity
 - A trustworthy foundation for future portfolio, debt, insurance, estate, tax, and
   AI-assisted planning capabilities
 
-The first customer is the project's creator. Daily usefulness, data trust, and decision
-quality take priority over feature volume.
+The first customer is the project's creator. A complete monthly update, trustworthy data,
+and useful review during material financial decisions take priority over feature volume.
 
 ## Product principles
 
@@ -58,10 +59,11 @@ wealth-os/
 └── .github/                 # Contribution workflows and templates
 ```
 
-The backend will begin as a modular monolith with explicit domain boundaries for
-accounts, assets, liabilities, holdings, market data, snapshots, and dashboard
-projections. Business rules belong inside domain modules; transport and persistence
-remain adapters.
+The backend begins as a modular monolith. The MVP domain centers on assets, liabilities,
+point-in-time valuations and balances, snapshots, financial-position calculations, and
+financial-structure calculations. Accounts, holdings, instruments, and market data remain
+future candidates rather than current MVP aggregates. Business rules belong inside domain
+modules; transport and persistence remain adapters.
 
 See the [architecture overview](docs/architecture/overview.md) and
 [ADR-001](docs/adr/0001-modular-monolith.md).
@@ -79,15 +81,15 @@ See the [architecture overview](docs/architecture/overview.md) and
 
 ## Roadmap
 
-1. **Milestone 0 — Repository bootstrap:** documentation, structure, contribution
-   workflow, and GitHub project setup.
-2. **Milestone 1 — Product definition:** vision, primary user, problem, outcomes,
-   success measures, and non-goals.
-3. **Milestone 2 — Architecture:** ADRs, domain model, data design, and security model.
-4. **Milestone 3 — API design:** resource model, DTOs, OpenAPI conventions, and
-   generated-client workflow.
-5. **Implementation:** only after the preceding foundations and corresponding issues
-   are approved.
+1. **Foundation — Complete:** repository workflow, product vision, modular-monolith ADR,
+   Kotlin build, core financial facts, and initial calculation engine.
+2. **Product convergence — In progress:** align MVP language, valuation policy, snapshot
+   comparison, provenance, and domain boundaries before persistence.
+3. **Data design:** snapshot reproducibility, correction semantics, PostgreSQL schema,
+   repository ports, and persistence adapters.
+4. **API design:** resources, DTOs, OpenAPI conventions, and generated-client workflow.
+5. **First vertical slice:** manual entry, current position and structure, saved snapshots,
+   basic snapshot comparison, and the web dashboard.
 
 ## Development workflow
 
@@ -113,8 +115,14 @@ Gradle installation is neither required nor supported as the project build contr
 
 ## Project status
 
-Wealth OS is in its documentation and repository-bootstrap phase. Production
-application code has not started.
+Product definition and the first Kotlin domain foundation are implemented. The repository
+contains immutable monetary facts, assets, liabilities, snapshots, and deterministic
+financial calculations with automated tests.
+
+The current work is converging the MVP and domain rules before persistence and HTTP APIs.
+Open decisions that must be resolved in or immediately after this phase include
+point-in-time metadata for reproducible historical structure calculations, snapshot
+correction semantics, and persistence design. No web vertical slice exists yet.
 
 ## License
 

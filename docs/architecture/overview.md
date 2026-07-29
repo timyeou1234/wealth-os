@@ -28,18 +28,19 @@ Each must remain independently buildable, testable, versionable, and deployable.
 
 ## Backend boundaries
 
-Initial candidate modules are:
+The implemented MVP domain begins with:
 
-- **Accounts:** ownership/container context for financial positions
-- **Assets:** non-security assets and valuations
-- **Liabilities:** debt balances, terms, and classification
-- **Holdings:** investment positions held by accounts
-- **Market Data:** external quotes, exchange rates, and provenance
+- **Assets:** material economic positions and their point-in-time valuations
+- **Liabilities:** material obligations and their point-in-time balances
 - **Snapshots:** point-in-time balance-sheet facts and history
-- **Dashboard:** read-oriented projections composed from other modules
+- **Financial Position and Structure:** deterministic totals and objective ratios
 
-These are candidates, not finalized service boundaries. Domain modeling in Milestone 2
-must clarify ownership, invariants, and language before packages or tables are created.
+Snapshot comparison is an MVP capability that will compare immutable snapshot facts
+without performing investment-performance attribution.
+
+Accounts, Holdings, security instruments, Market Data, and Dashboard projections remain
+candidate future boundaries. In the MVP, institution and account labels are descriptive
+context rather than aggregates that own positions.
 
 Dependencies should point toward domain logic:
 
@@ -68,7 +69,13 @@ They must not reach into one another's persistence implementation.
 - PostgreSQL is the transactional source of truth.
 - Money is modeled with explicit amount and ISO currency; never binary floating point.
 - Time-varying values include effective timestamps and provenance.
+- MVP calculations consume values already expressed in the user's selected base currency.
+- Foreign-currency values are manually converted; their source must record the original
+  amount, conversion rate or basis, and effective time needed to explain the assumption.
+- Mixed-currency snapshots are incomplete rather than implicitly converted.
 - Historical snapshots are immutable or reproducible from immutable facts.
+- Historical structure calculations require the point-in-time liquidity classification
+  associated with each saved valuation; current metadata must never rewrite old results.
 - Migrations are forward-only in deployed environments and reviewed like application
   code.
 - Real personal financial data is never used as a test fixture.
@@ -87,11 +94,13 @@ documented. Before production data is introduced, the project must define:
 
 ## Deferred decisions
 
-Milestone 2 must resolve or record:
+Before persistence begins, the project must resolve or record:
 
-- Domain model and aggregate boundaries
-- Multi-currency valuation rules
+- How snapshots preserve point-in-time descriptive metadata, including liquidity
 - Snapshot creation and correction semantics
 - Database ownership and schema conventions
 - Authentication and deployment threat model
 - Observability and audit requirements
+
+Automatic FX conversion, Account and Holding aggregates, security instruments, and market
+data are deliberately deferred beyond the MVP.

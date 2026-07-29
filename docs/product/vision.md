@@ -2,8 +2,8 @@
 
 ## Vision
 
-Give an individual a trustworthy, longitudinal view of their entire financial position
-so they can make better long-term wealth decisions.
+Provide a trustworthy historical personal balance sheet: a private record of what an
+individual owns, what they owe, and how that financial position changes over time.
 
 ## Primary user
 
@@ -13,8 +13,8 @@ They value ownership of their financial picture, historical context, and decisio
 quality more than daily spending categorization.
 
 The project creator is the first and most important customer. Work should prove useful
-in real daily or periodic wealth-management routines before optimizing for a broader
-market.
+in a monthly full update and whenever a material financial decision or event calls for a
+review before optimizing for a broader market.
 
 ## Problem
 
@@ -23,25 +23,28 @@ They make it difficult to answer:
 
 - What is my complete net worth today?
 - Which assets and liabilities explain the change since an earlier date?
-- How concentrated, leveraged, and liquid is my balance sheet?
-- Is my long-term financial health improving?
+- How leveraged is my balance sheet, and how much is immediately liquid?
 - Can I trust the values, dates, currencies, and provenance behind the answer?
 
 ## Product promise
 
-Wealth OS will make the state and trajectory of personal wealth understandable. It will
-favor explainable calculations, explicit assumptions, and traceable data over false
-precision.
+Wealth OS will make the state and historical trajectory of personal wealth
+understandable. It will favor explainable calculations, explicit assumptions, and
+traceable data over false precision.
 
 ## Core capabilities
 
 The first useful product should:
 
-1. Represent accounts, assets, liabilities, and their valuations.
+1. Represent material assets, liabilities, and their point-in-time values.
 2. Calculate net worth consistently as of a point in time.
 3. Preserve immutable or reproducible historical snapshots.
-4. Explain material changes between snapshots.
-5. Surface a small set of meaningful financial-health indicators.
+4. Compare adjacent snapshots using total and item-level changes.
+5. Separate financial position from objective financial-structure indicators.
+
+The MVP does not attribute changes to market performance, contributions, withdrawals,
+income, or spending. That requires transaction and cash-flow data outside the first
+balance-sheet model.
 
 ## Principles
 

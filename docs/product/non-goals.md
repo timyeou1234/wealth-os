@@ -3,7 +3,8 @@
 ## Purpose
 
 This document keeps the first Wealth OS release focused on establishing a trustworthy
-personal balance sheet and a small set of objective financial-health indicators.
+historical personal balance sheet, objective financial-position and structure views, and
+basic snapshot comparison.
 
 An excluded capability is not necessarily a bad idea. It is excluded because it is not
 required to prove the first product outcome.
@@ -32,6 +33,7 @@ The MVP does not include:
 - Real-time market prices
 - Automatic property or vehicle valuation
 - Background data refresh
+- Automatic foreign-exchange conversion or historical FX feeds
 
 Manual entry is an intentional first integration. Automation may be added later only when it
 preserves provenance, reproducibility, and user trust.
@@ -62,10 +64,13 @@ The MVP does not include:
 - Diversification or concentration scoring
 - Risk-adjusted returns
 - Net-worth growth attribution between snapshots
+- Attribution of snapshot changes to market performance, contributions, withdrawals,
+  income, spending, or foreign exchange
 - A composite financial-health score
 
-Historical snapshots are included as trustworthy records, but advanced comparison and
-interpretation can be introduced after the core data model is validated.
+Basic snapshot comparison is included: totals and item-level values may be compared, and
+positions may be marked added, removed, changed, or stale. Performance and causal
+attribution remain excluded until the required transaction and market data exists.
 
 ## Collaboration and platforms
 
@@ -76,6 +81,7 @@ The MVP does not include:
 - Public sharing
 - Native iOS or Android applications
 - Payment initiation, trading, or custody
+- Full Account, Holding, and security-instrument domain models
 
 The initial product is a single-user web application focused on the project creator as the
 first customer.
@@ -95,6 +101,6 @@ hypothetical future scale.
 ## Reconsideration rule
 
 A non-goal may move into scope only when there is evidence that it is necessary to improve
-the core experience of understanding financial position and financial health. Such a change
-should be documented in a new issue and reflected in the product definition before
+the core experience of understanding historical financial position and structure. Such a
+change should be documented in a new issue and reflected in the product definition before
 implementation begins.
