@@ -28,6 +28,12 @@ liability
 snapshot
 ├── Snapshot (aggregate root)
 └── SnapshotId
+
+financialhealth
+├── FinancialHealth
+├── FinancialHealthCalculator (pure domain service)
+├── FinancialHealthResult
+└── FinancialRatio
 ```
 
 Assets and liabilities describe positions. Their values and balances vary with time,
@@ -66,11 +72,19 @@ It enforces:
 - Input collections are defensively copied.
 
 Snapshot may contain multiple currencies because it records facts rather than silently
-normalizing them. Issue #8 must reject mixed-currency calculation inputs until an
-explicit conversion policy exists.
+normalizing them. Financial-health calculations return an explicit insufficient-data
+result for mixed-currency inputs until an explicit conversion policy exists.
 
-## Deferred calculations
+## Financial-health calculations
 
-`FinancialHealth`, totals, net worth, debt ratio, and liquidity ratio belong to Issue
-#8. Keeping them outside this model prevents derived values from becoming a second
-source of truth.
+`FinancialHealthCalculator` derives totals, net worth, debt ratio, and liquidity ratio
+without mutating the source snapshot. It accepts asset metadata separately because
+liquidity belongs to the Asset entity rather than the point-in-time valuation fact.
+
+- Only assets classified as `LIQUID` contribute to liquid assets.
+- Ratio values are fractions rather than percentages.
+- Ratios use six decimal places and `RoundingMode.HALF_EVEN`.
+- A zero total-assets denominator produces `FinancialRatio.Undefined`.
+- Empty facts, missing or unknown asset valuations, and mixed currencies produce an
+  explicit `FinancialHealthResult.InsufficientData`.
+- Derived values are not stored in Snapshot and do not become a second source of truth.
