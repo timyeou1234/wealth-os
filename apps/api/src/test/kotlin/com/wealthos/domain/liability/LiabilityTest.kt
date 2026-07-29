@@ -28,7 +28,23 @@ class LiabilityTest {
                 liabilityId = LiabilityId.new(),
                 balance = Money.of(BigDecimal("-1.00"), Currency.of("USD")),
                 effectiveAt = Instant.parse("2026-07-27T00:00:00Z"),
+                source = LiabilitySource.of("manual"),
             )
+        }
+    }
+
+    @Test
+    fun `normalizes liability provenance`() {
+        assertEquals("bank statement", LiabilitySource.of("  bank statement  ").value)
+    }
+
+    @Test
+    fun `rejects invalid liability provenance`() {
+        assertFailsWith<IllegalArgumentException> {
+            LiabilitySource.of(" ")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            LiabilitySource.of("a".repeat(101))
         }
     }
 }

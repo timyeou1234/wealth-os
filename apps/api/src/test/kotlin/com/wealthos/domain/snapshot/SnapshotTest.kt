@@ -5,6 +5,7 @@ import com.wealthos.domain.asset.AssetValuation
 import com.wealthos.domain.asset.ValuationSource
 import com.wealthos.domain.liability.LiabilityBalance
 import com.wealthos.domain.liability.LiabilityId
+import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
 import java.math.BigDecimal
@@ -92,5 +93,6 @@ class SnapshotTest {
             liabilityId = liabilityId,
             balance = Money.of(BigDecimal("50.00"), usd),
             effectiveAt = effectiveAt,
+            source = LiabilitySource.of("manual"),
         )
 }
