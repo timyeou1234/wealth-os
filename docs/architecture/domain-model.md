@@ -2,8 +2,8 @@
 
 ## Purpose
 
-The core domain represents financial facts. It does not calculate financial-health
-metrics, persist data, expose HTTP resources, or depend on Spring.
+The core domain represents financial facts and deterministic calculations over them. It
+does not persist data, expose HTTP resources, or depend on Spring.
 
 ## Language and boundaries
 
@@ -23,13 +23,14 @@ asset
 liability
 ├── Liability (entity)
 ├── LiabilityId
+├── LiabilitySource
 └── LiabilityBalance (point-in-time fact)
 
 snapshot
 ├── Snapshot (aggregate root)
 └── SnapshotId
 
-financialhealth
+financialhealth (implemented package; product language is position and structure)
 ├── FinancialHealth
 ├── FinancialHealthCalculator (pure domain service)
 ├── FinancialHealthResult
@@ -46,8 +47,12 @@ so those values are modeled as separate facts rather than mutable entity fields.
 - Precision loss fails by default.
 - Callers must select a `RoundingMode` explicitly when rounding is intended.
 - Arithmetic and comparison require the same currency.
-- Foreign-exchange conversion is not implicit and is deferred to a future explicit
-  valuation policy.
+- The user selects one base currency for an MVP snapshot.
+- Values supplied to snapshot calculations are already expressed in that base currency.
+- A manually converted value records the original amount, exchange-rate basis, and
+  effective time in its provenance.
+- Automatic foreign-exchange conversion is deferred. Mixed-currency facts produce an
+  explicit insufficient-data result rather than implicit conversion.
 
 ## Identity
 
@@ -62,7 +67,7 @@ timezone ambiguity in financial facts.
 ## Snapshot aggregate
 
 Snapshot is an immutable point-in-time collection of asset valuations and liability
-balances.
+balances. Both facts carry an effective time and identifiable provenance.
 
 It enforces:
 
@@ -72,19 +77,51 @@ It enforces:
 - Input collections are defensively copied.
 
 Snapshot may contain multiple currencies because it records facts rather than silently
-normalizing them. Financial-health calculations return an explicit insufficient-data
-result for mixed-currency inputs until an explicit conversion policy exists.
+normalizing them. Position and structure calculations return an explicit
+insufficient-data result for mixed-currency inputs. MVP application use cases are
+responsible for collecting base-currency facts before calculation.
 
-## Financial-health calculations
+The current Snapshot stores values and provenance but receives Asset metadata separately
+for structure calculations. Persistence must preserve or embed point-in-time liquidity
+metadata before historical structure results can be considered reproducible. Current
+Asset metadata must not be used to silently reinterpret an older snapshot.
 
-`FinancialHealthCalculator` derives totals, net worth, debt ratio, and liquidity ratio
-without mutating the source snapshot. It accepts asset metadata separately because
-liquidity belongs to the Asset entity rather than the point-in-time valuation fact.
+## Financial-position and structure calculations
 
-- Only assets classified as `LIQUID` contribute to liquid assets.
+The currently named `FinancialHealthCalculator` derives financial position (total assets,
+total liabilities, and net worth) and financial structure (debt ratio and immediately
+liquid asset share) without mutating the source snapshot. The package name is retained
+until a focused refactor issue changes public domain types.
+
+- Assets use `LIQUID`, `SEMI_LIQUID`, or `ILLIQUID`.
+- Only assets classified as `LIQUID` contribute to immediately liquid assets.
 - Ratio values are fractions rather than percentages.
 - Ratios use six decimal places and `RoundingMode.HALF_EVEN`.
 - A zero total-assets denominator produces `FinancialRatio.Undefined`.
 - Empty facts, missing or unknown asset valuations, and mixed currencies produce an
   explicit `FinancialHealthResult.InsufficientData`.
 - Derived values are not stored in Snapshot and do not become a second source of truth.
+
+## MVP asset boundary
+
+An Asset is a material economic position whose value the user wants to track
+independently. A bank deposit, named stock position, cryptocurrency position, or property
+may each be an Asset in the MVP.
+
+Accounts and Holdings are not current aggregates. Optional institution or account labels
+may provide descriptive context, but they do not own calculations or introduce a separate
+position hierarchy. A fuller account/instrument/holding model requires a later product
+need and domain decision.
+
+## Snapshot comparison
+
+Basic comparison is an application/domain capability over two saved snapshots. It will
+report:
+
+- changes in total assets, total liabilities, and net worth;
+- changed values for matching asset and liability identities;
+- positions added or removed between snapshots; and
+- facts whose effective dates indicate stale data.
+
+It must not claim investment performance or causal attribution. Those require transaction,
+cash-flow, market-price, and FX data outside the MVP.

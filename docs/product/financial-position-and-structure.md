@@ -1,13 +1,12 @@
-# Financial Health
+# Financial Position and Structure
 
 ## Purpose
 
-Wealth OS presents financial health as a small set of objective, explainable indicators
-derived from a personal balance sheet.
+Wealth OS separates balance-sheet facts about **financial position** from objective,
+explainable ratios about **financial structure**.
 
-The first release does not provide a personalized target, recommendation, or composite
-score. It describes the user's current financial structure so that later decisions can be
-made from a trustworthy foundation.
+The first release does not label either category as universally healthy or unhealthy. It
+does not provide a personalized target, recommendation, or composite score.
 
 ## Product principle
 
@@ -15,7 +14,7 @@ made from a trustworthy foundation.
 
 ## MVP rules
 
-Every MVP financial-health metric must be:
+Every MVP derived value must be:
 
 - Objective: derived from recorded financial data rather than subjective judgment.
 - Balance-sheet-only: calculated without income, spending, budgets, goals, or forecasts.
@@ -26,18 +25,23 @@ Every MVP financial-health metric must be:
 
 ## Asset liquidity classification
 
-The liquidity ratio requires each asset to have an explicit liquidity classification.
-For the MVP, an asset is either:
+The immediately liquid asset share requires each asset to have one of three explicit
+classifications:
 
-- **Liquid**: reasonably convertible to the base currency without a long sale process or a
-  material assumption about finding a buyer.
-- **Illiquid**: dependent on a longer sale process, material transaction costs, or uncertain
+- **Liquid:** available in the base currency or reasonably convertible without a material
+  delay, sale process, or execution uncertainty.
+- **Semi-liquid:** marketable but subject to meaningful settlement time, restrictions,
+  transaction costs, volatility, or other access friction.
+- **Illiquid:** dependent on a longer sale process, material transaction costs, or uncertain
   execution.
 
 The classification must be visible and editable. Wealth OS must not silently infer a
 classification that the user cannot inspect.
 
-## MVP metrics
+Only **Liquid** assets contribute to the MVP immediately liquid asset share. Semi-liquid
+and illiquid assets remain visible in the breakdown but are excluded from the numerator.
+
+## Financial position
 
 ### Total assets
 
@@ -84,6 +88,8 @@ Net Worth = Total Assets - Total Liabilities
 **Explainability:** Net worth must link back to both totals and ultimately to every underlying
 asset and liability.
 
+## Financial structure
+
 ### Debt ratio
 
 **Question:** How leveraged is my balance sheet?
@@ -106,7 +112,7 @@ thresholds.
 - Negative liability values are invalid unless a later domain decision explicitly supports
   them.
 
-### Liquidity ratio
+### Immediately liquid asset share
 
 **Question:** How much of my asset base is readily available rather than tied up in illiquid
 assets?
@@ -114,13 +120,13 @@ assets?
 **Formula:**
 
 ```text
-Liquidity Ratio = Liquid Assets / Total Assets
+Immediately Liquid Asset Share = Liquid Assets / Total Assets
 ```
 
 **Required data:** Asset valuations and the explicit liquidity classification of each asset.
 
-**Interpretation:** A larger ratio indicates that more of the asset base is readily available.
-The MVP does not assume that a universally higher ratio is always better.
+**Interpretation:** A larger ratio indicates that more of the asset base is immediately
+available. The MVP does not assume that a universally higher ratio is always better.
 
 **Explainability:** The user must be able to inspect which assets are included as liquid and
 which are excluded.
@@ -128,8 +134,8 @@ which are excluded.
 **Edge cases:**
 
 - When total assets are zero, the ratio is undefined rather than zero.
-- An unclassified asset must not be silently included in either category; the metric should
-  be marked incomplete until the classification is resolved.
+- A missing or unknown classification makes the metric incomplete.
+- Semi-liquid assets are excluded from the numerator rather than partially weighted.
 
 ## Deliberately excluded indicators
 
@@ -146,5 +152,6 @@ judgment outside the MVP balance sheet:
 
 ## Future evolution
 
-Future versions may introduce personalized goals, thresholds, and recommendations only after
-the underlying balance sheet and metric definitions remain trustworthy and explainable.
+Future versions may introduce personalized goals, thresholds, and recommendations only
+after the underlying balance sheet and structure definitions remain trustworthy and
+explainable.
