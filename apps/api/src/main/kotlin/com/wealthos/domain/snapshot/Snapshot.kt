@@ -1,31 +1,31 @@
 package com.wealthos.domain.snapshot
 
-import com.wealthos.domain.asset.AssetValuation
-import com.wealthos.domain.liability.LiabilityBalance
 import java.time.Instant
 
 class Snapshot private constructor(
     val id: SnapshotId,
     val asOf: Instant,
-    assetValuations: List<AssetValuation>,
-    liabilityBalances: List<LiabilityBalance>,
+    assetPositions: List<SnapshotAssetPosition>,
+    liabilityPositions: List<SnapshotLiabilityPosition>,
+    val supersedes: SnapshotId?,
 ) {
-    val assetValuations: List<AssetValuation> = assetValuations.toList()
-    val liabilityBalances: List<LiabilityBalance> = liabilityBalances.toList()
+    val assetPositions: List<SnapshotAssetPosition> = assetPositions.toList()
+    val liabilityPositions: List<SnapshotLiabilityPosition> = liabilityPositions.toList()
 
     init {
-        require(this.assetValuations.all { !it.effectiveAt.isAfter(asOf) }) {
+        require(this.assetPositions.all { !it.valuation.effectiveAt.isAfter(asOf) }) {
             "Asset valuation cannot be effective after the snapshot"
         }
-        require(this.liabilityBalances.all { !it.effectiveAt.isAfter(asOf) }) {
+        require(this.liabilityPositions.all { !it.balance.effectiveAt.isAfter(asOf) }) {
             "Liability balance cannot be effective after the snapshot"
         }
-        require(this.assetValuations.map { it.assetId }.distinct().size == this.assetValuations.size) {
-            "Snapshot must contain at most one valuation for each asset"
+        require(this.assetPositions.map { it.assetId }.distinct().size == this.assetPositions.size) {
+            "Snapshot must contain at most one position for each asset"
         }
-        require(this.liabilityBalances.map { it.liabilityId }.distinct().size == this.liabilityBalances.size) {
-            "Snapshot must contain at most one balance for each liability"
+        require(this.liabilityPositions.map { it.liabilityId }.distinct().size == this.liabilityPositions.size) {
+            "Snapshot must contain at most one position for each liability"
         }
+        require(supersedes != id) { "Snapshot cannot supersede itself" }
     }
 
     override fun equals(other: Any?): Boolean = this === other || (other is Snapshot && id == other.id)
@@ -33,11 +33,32 @@ class Snapshot private constructor(
     override fun hashCode(): Int = id.hashCode()
 
     companion object {
-        fun create(
+        fun capture(
             id: SnapshotId,
             asOf: Instant,
-            assetValuations: List<AssetValuation> = emptyList(),
-            liabilityBalances: List<LiabilityBalance> = emptyList(),
-        ): Snapshot = Snapshot(id, asOf, assetValuations, liabilityBalances)
+            assetPositions: List<SnapshotAssetPosition> = emptyList(),
+            liabilityPositions: List<SnapshotLiabilityPosition> = emptyList(),
+        ): Snapshot =
+            Snapshot(
+                id = id,
+                asOf = asOf,
+                assetPositions = assetPositions,
+                liabilityPositions = liabilityPositions,
+                supersedes = null,
+            )
+
+        fun correction(
+            id: SnapshotId,
+            supersedes: Snapshot,
+            assetPositions: List<SnapshotAssetPosition> = emptyList(),
+            liabilityPositions: List<SnapshotLiabilityPosition> = emptyList(),
+        ): Snapshot =
+            Snapshot(
+                id = id,
+                asOf = supersedes.asOf,
+                assetPositions = assetPositions,
+                liabilityPositions = liabilityPositions,
+                supersedes = supersedes.id,
+            )
     }
 }
