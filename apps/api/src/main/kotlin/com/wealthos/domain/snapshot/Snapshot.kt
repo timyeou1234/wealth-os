@@ -9,14 +9,20 @@ import java.time.Instant
 class Snapshot private constructor(
     val id: SnapshotId,
     val asOf: Instant,
+    val recordedAt: Instant,
     assetPositions: List<SnapshotAssetPosition>,
     liabilityPositions: List<SnapshotLiabilityPosition>,
-    val supersedes: SnapshotId?,
+    val correction: SnapshotCorrection?,
 ) {
     val assetPositions: List<SnapshotAssetPosition> = assetPositions.toList()
     val liabilityPositions: List<SnapshotLiabilityPosition> = liabilityPositions.toList()
+    val supersedes: SnapshotId?
+        get() = correction?.supersedes
 
     init {
+        require(!recordedAt.isBefore(asOf)) {
+            "Snapshot cannot be recorded before its financial as-of time"
+        }
         require(this.assetPositions.all { !it.valuation.effectiveAt.isAfter(asOf) }) {
             "Asset valuation cannot be effective after the snapshot"
         }
@@ -29,7 +35,7 @@ class Snapshot private constructor(
         require(this.liabilityPositions.map { it.liabilityId }.distinct().size == this.liabilityPositions.size) {
             "Snapshot must contain at most one position for each liability"
         }
-        require(supersedes != id) { "Snapshot cannot supersede itself" }
+        require(correction?.supersedes != id) { "Snapshot cannot supersede itself" }
     }
 
     override fun equals(other: Any?): Boolean = this === other || (other is Snapshot && id == other.id)
@@ -40,6 +46,7 @@ class Snapshot private constructor(
         fun capture(
             id: SnapshotId,
             asOf: Instant,
+            recordedAt: Instant,
             assets: Collection<Asset> = emptyList(),
             assetValuations: Collection<AssetValuation> = emptyList(),
             liabilities: Collection<Liability> = emptyList(),
@@ -80,6 +87,7 @@ class Snapshot private constructor(
             return Snapshot(
                 id = id,
                 asOf = asOf,
+                recordedAt = recordedAt,
                 assetPositions =
                     assets.map { asset ->
                         SnapshotAssetPosition.capture(
@@ -94,23 +102,35 @@ class Snapshot private constructor(
                             balance = balancesByLiabilityId.getValue(liability.id),
                         )
                     },
-                supersedes = null,
+                correction = null,
             )
         }
 
         fun correction(
             id: SnapshotId,
             supersedes: Snapshot,
-            assetPositions: List<SnapshotAssetPosition> = emptyList(),
-            liabilityPositions: List<SnapshotLiabilityPosition> = emptyList(),
-        ): Snapshot =
-            Snapshot(
+            recordedAt: Instant,
+            reason: CorrectionReason,
+            replacementAssetPositions: Collection<SnapshotAssetPosition>,
+            replacementLiabilityPositions: Collection<SnapshotLiabilityPosition>,
+        ): Snapshot {
+            require(!recordedAt.isBefore(supersedes.recordedAt)) {
+                "Snapshot correction cannot be recorded before the snapshot it supersedes"
+            }
+
+            return Snapshot(
                 id = id,
                 asOf = supersedes.asOf,
-                assetPositions = assetPositions,
-                liabilityPositions = liabilityPositions,
-                supersedes = supersedes.id,
+                recordedAt = recordedAt,
+                assetPositions = replacementAssetPositions.toList(),
+                liabilityPositions = replacementLiabilityPositions.toList(),
+                correction =
+                    SnapshotCorrection(
+                        supersedes = supersedes.id,
+                        reason = reason,
+                    ),
             )
+        }
 
         private fun captureMismatchMessage(
             positionType: String,

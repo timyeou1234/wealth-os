@@ -22,6 +22,7 @@ import kotlin.test.assertTrue
 
 class SnapshotTest {
     private val asOf = Instant.parse("2026-07-27T00:00:00Z")
+    private val recordedAt = asOf.plusSeconds(60)
     private val usd = Currency.of("USD")
 
     @Test
@@ -36,6 +37,7 @@ class SnapshotTest {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
+                recordedAt = recordedAt,
                 assets = assets,
                 assetValuations = valuations,
                 liabilities = liabilities,
@@ -52,7 +54,9 @@ class SnapshotTest {
         assertEquals("Cash", snapshot.assetPositions.single().name)
         assertEquals(Liquidity.LIQUID, snapshot.assetPositions.single().liquidity)
         assertEquals("Mortgage", snapshot.liabilityPositions.single().name)
+        assertEquals(recordedAt, snapshot.recordedAt)
         assertNull(snapshot.supersedes)
+        assertNull(snapshot.correction)
     }
 
     @Test
@@ -65,6 +69,7 @@ class SnapshotTest {
                 Snapshot.capture(
                     id = SnapshotId.new(),
                     asOf = asOf,
+                    recordedAt = recordedAt,
                     assets = listOf(asset),
                 )
             }
@@ -73,6 +78,7 @@ class SnapshotTest {
                 Snapshot.capture(
                     id = SnapshotId.new(),
                     asOf = asOf,
+                    recordedAt = recordedAt,
                     assetValuations = listOf(valuation(unknownAssetId)),
                 )
             }
@@ -91,6 +97,7 @@ class SnapshotTest {
                 Snapshot.capture(
                     id = SnapshotId.new(),
                     asOf = asOf,
+                    recordedAt = recordedAt,
                     liabilities = listOf(liability),
                 )
             }
@@ -99,6 +106,7 @@ class SnapshotTest {
                 Snapshot.capture(
                     id = SnapshotId.new(),
                     asOf = asOf,
+                    recordedAt = recordedAt,
                     liabilityBalances = listOf(balance(unknownLiabilityId)),
                 )
             }
@@ -116,6 +124,7 @@ class SnapshotTest {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
+                recordedAt = recordedAt,
                 assets = listOf(asset, asset),
                 assetValuations = listOf(valuation(asset.id)),
             )
@@ -124,6 +133,7 @@ class SnapshotTest {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
+                recordedAt = recordedAt,
                 assets = listOf(asset),
                 assetValuations = listOf(valuation(asset.id), valuation(asset.id)),
             )
@@ -132,6 +142,7 @@ class SnapshotTest {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
+                recordedAt = recordedAt,
                 liabilities = listOf(liability, liability),
                 liabilityBalances = listOf(balance(liability.id)),
             )
@@ -140,6 +151,7 @@ class SnapshotTest {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
+                recordedAt = recordedAt,
                 liabilities = listOf(liability),
                 liabilityBalances = listOf(balance(liability.id), balance(liability.id)),
             )
@@ -156,6 +168,7 @@ class SnapshotTest {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
+                recordedAt = recordedAt,
                 assets = listOf(asset),
                 assetValuations = listOf(valuation(asset.id, future)),
             )
@@ -164,6 +177,7 @@ class SnapshotTest {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
+                recordedAt = recordedAt,
                 liabilities = listOf(liability),
                 liabilityBalances = listOf(balance(liability.id, future)),
             )
@@ -232,30 +246,102 @@ class SnapshotTest {
     }
 
     @Test
-    fun `creates an immutable correction that supersedes a prior snapshot`() {
-        val original = Snapshot.capture(SnapshotId.new(), asOf)
+    fun `creates an auditable full replacement correction`() {
         val asset = asset()
-        val replacement = SnapshotAssetPosition.capture(asset, valuation(asset.id))
+        val liability = liability()
+        val original =
+            Snapshot.capture(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                recordedAt = recordedAt,
+                assets = listOf(asset),
+                assetValuations = listOf(valuation(asset.id)),
+                liabilities = listOf(liability),
+                liabilityBalances = listOf(balance(liability.id)),
+            )
+        val replacementAsset = asset(name = "Corrected cash")
+        val replacementLiability = liability(name = "Corrected mortgage")
+        val replacementAssets =
+            mutableListOf(
+                SnapshotAssetPosition.capture(
+                    replacementAsset,
+                    valuation(replacementAsset.id),
+                ),
+            )
+        val replacementLiabilities =
+            mutableListOf(
+                SnapshotLiabilityPosition.capture(
+                    replacementLiability,
+                    balance(replacementLiability.id),
+                ),
+            )
+        val correctionRecordedAt = recordedAt.plusSeconds(60)
         val correction =
             Snapshot.correction(
                 id = SnapshotId.new(),
                 supersedes = original,
-                assetPositions = listOf(replacement),
+                recordedAt = correctionRecordedAt,
+                reason = CorrectionReason.of("  Corrected omitted positions  "),
+                replacementAssetPositions = replacementAssets,
+                replacementLiabilityPositions = replacementLiabilities,
             )
+
+        replacementAssets.clear()
+        replacementLiabilities.clear()
 
         assertEquals(original.id, correction.supersedes)
         assertEquals(original.asOf, correction.asOf)
+        assertEquals(correctionRecordedAt, correction.recordedAt)
+        assertEquals("Corrected omitted positions", correction.correction?.reason?.value)
+        assertEquals("Corrected cash", correction.assetPositions.single().name)
+        assertEquals("Corrected mortgage", correction.liabilityPositions.single().name)
+        assertEquals("Cash", original.assetPositions.single().name)
+        assertEquals("Mortgage", original.liabilityPositions.single().name)
     }
 
     @Test
     fun `rejects a correction that supersedes itself`() {
         val id = SnapshotId.new()
-        val original = Snapshot.capture(id, asOf)
+        val original = Snapshot.capture(id, asOf, recordedAt)
 
         assertFailsWith<IllegalArgumentException> {
             Snapshot.correction(
                 id = id,
                 supersedes = original,
+                recordedAt = recordedAt,
+                reason = CorrectionReason.of("Correction"),
+                replacementAssetPositions = emptyList(),
+                replacementLiabilityPositions = emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun `rejects blank correction reasons`() {
+        assertFailsWith<IllegalArgumentException> {
+            CorrectionReason.of(" ")
+        }
+    }
+
+    @Test
+    fun `rejects impossible recording times`() {
+        assertFailsWith<IllegalArgumentException> {
+            Snapshot.capture(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                recordedAt = asOf.minusSeconds(1),
+            )
+        }
+
+        val original = Snapshot.capture(SnapshotId.new(), asOf, recordedAt)
+        assertFailsWith<IllegalArgumentException> {
+            Snapshot.correction(
+                id = SnapshotId.new(),
+                supersedes = original,
+                recordedAt = recordedAt.minusSeconds(1),
+                reason = CorrectionReason.of("Correction"),
+                replacementAssetPositions = emptyList(),
+                replacementLiabilityPositions = emptyList(),
             )
         }
     }

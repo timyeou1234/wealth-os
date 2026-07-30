@@ -203,6 +203,7 @@ class FinancialHealthCalculatorTest {
         Snapshot.capture(
             id = SnapshotId.new(),
             asOf = asOf,
+            recordedAt = asOf,
             assets =
                 assets.map {
                     Asset(it.assetId, it.name, it.type, it.liquidity)
