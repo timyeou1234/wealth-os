@@ -199,7 +199,21 @@ class FinancialHealthCalculatorTest {
     private fun snapshot(
         assets: List<SnapshotAssetPosition> = emptyList(),
         liabilities: List<SnapshotLiabilityPosition> = emptyList(),
-    ): Snapshot = Snapshot.capture(SnapshotId.new(), asOf, assets, liabilities)
+    ): Snapshot =
+        Snapshot.capture(
+            id = SnapshotId.new(),
+            asOf = asOf,
+            assets =
+                assets.map {
+                    Asset(it.assetId, it.name, it.type, it.liquidity)
+                },
+            assetValuations = assets.map(SnapshotAssetPosition::valuation),
+            liabilities =
+                liabilities.map {
+                    Liability(it.liabilityId, it.name)
+                },
+            liabilityBalances = liabilities.map(SnapshotLiabilityPosition::balance),
+        )
 
     private fun assetPosition(
         name: String,

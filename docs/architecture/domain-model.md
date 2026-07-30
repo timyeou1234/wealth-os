@@ -74,6 +74,8 @@ provenance required to display and recalculate history.
 
 It enforces:
 
+- A normal capture has exactly one valuation or balance for every in-scope current
+  position, with no facts for unknown positions.
 - No fact may be effective after the snapshot's `asOf` time.
 - A position identity must match the identity of its valuation or balance.
 - At most one position exists for an asset in one snapshot.

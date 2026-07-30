@@ -18,81 +18,156 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SnapshotTest {
     private val asOf = Instant.parse("2026-07-27T00:00:00Z")
     private val usd = Currency.of("USD")
 
     @Test
-    fun `defensively copies its captured positions`() {
-        val assets = mutableListOf(assetPosition())
-        val liabilities = mutableListOf(liabilityPosition())
-        val snapshot = Snapshot.capture(SnapshotId.new(), asOf, assets, liabilities)
+    fun `captures a complete self contained balance sheet`() {
+        val asset = asset()
+        val liability = liability()
+        val assets = mutableListOf(asset)
+        val valuations = mutableListOf(valuation(asset.id))
+        val liabilities = mutableListOf(liability)
+        val balances = mutableListOf(balance(liability.id))
+        val snapshot =
+            Snapshot.capture(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                assets = assets,
+                assetValuations = valuations,
+                liabilities = liabilities,
+                liabilityBalances = balances,
+            )
 
         assets.clear()
+        valuations.clear()
         liabilities.clear()
+        balances.clear()
 
         assertEquals(1, snapshot.assetPositions.size)
         assertEquals(1, snapshot.liabilityPositions.size)
+        assertEquals("Cash", snapshot.assetPositions.single().name)
+        assertEquals(Liquidity.LIQUID, snapshot.assetPositions.single().liquidity)
+        assertEquals("Mortgage", snapshot.liabilityPositions.single().name)
         assertNull(snapshot.supersedes)
+    }
+
+    @Test
+    fun `rejects missing and unknown asset valuations`() {
+        val asset = asset()
+        val unknownAssetId = AssetId.new()
+
+        val missing =
+            assertFailsWith<IllegalArgumentException> {
+                Snapshot.capture(
+                    id = SnapshotId.new(),
+                    asOf = asOf,
+                    assets = listOf(asset),
+                )
+            }
+        val unknown =
+            assertFailsWith<IllegalArgumentException> {
+                Snapshot.capture(
+                    id = SnapshotId.new(),
+                    asOf = asOf,
+                    assetValuations = listOf(valuation(unknownAssetId)),
+                )
+            }
+
+        assertTrue(missing.message.orEmpty().contains("missing=[${asset.id}]"))
+        assertTrue(unknown.message.orEmpty().contains("unknown=[$unknownAssetId]"))
+    }
+
+    @Test
+    fun `rejects missing and unknown liability balances`() {
+        val liability = liability()
+        val unknownLiabilityId = LiabilityId.new()
+
+        val missing =
+            assertFailsWith<IllegalArgumentException> {
+                Snapshot.capture(
+                    id = SnapshotId.new(),
+                    asOf = asOf,
+                    liabilities = listOf(liability),
+                )
+            }
+        val unknown =
+            assertFailsWith<IllegalArgumentException> {
+                Snapshot.capture(
+                    id = SnapshotId.new(),
+                    asOf = asOf,
+                    liabilityBalances = listOf(balance(unknownLiabilityId)),
+                )
+            }
+
+        assertTrue(missing.message.orEmpty().contains("missing=[${liability.id}]"))
+        assertTrue(unknown.message.orEmpty().contains("unknown=[$unknownLiabilityId]"))
+    }
+
+    @Test
+    fun `rejects duplicate position identities and financial facts`() {
+        val asset = asset()
+        val liability = liability()
+
+        assertFailsWith<IllegalArgumentException> {
+            Snapshot.capture(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                assets = listOf(asset, asset),
+                assetValuations = listOf(valuation(asset.id)),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Snapshot.capture(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                assets = listOf(asset),
+                assetValuations = listOf(valuation(asset.id), valuation(asset.id)),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Snapshot.capture(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                liabilities = listOf(liability, liability),
+                liabilityBalances = listOf(balance(liability.id)),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Snapshot.capture(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                liabilities = listOf(liability),
+                liabilityBalances = listOf(balance(liability.id), balance(liability.id)),
+            )
+        }
     }
 
     @Test
     fun `rejects facts effective after the snapshot`() {
         val future = asOf.plusSeconds(1)
+        val asset = asset()
+        val liability = liability()
 
         assertFailsWith<IllegalArgumentException> {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
-                assetPositions = listOf(assetPosition(effectiveAt = future)),
+                assets = listOf(asset),
+                assetValuations = listOf(valuation(asset.id, future)),
             )
         }
-
         assertFailsWith<IllegalArgumentException> {
             Snapshot.capture(
                 id = SnapshotId.new(),
                 asOf = asOf,
-                liabilityPositions = listOf(liabilityPosition(effectiveAt = future)),
+                liabilities = listOf(liability),
+                liabilityBalances = listOf(balance(liability.id, future)),
             )
         }
-    }
-
-    @Test
-    fun `rejects duplicate positions for the same identity`() {
-        val asset = assetPosition()
-        val liability = liabilityPosition()
-
-        assertFailsWith<IllegalArgumentException> {
-            Snapshot.capture(
-                id = SnapshotId.new(),
-                asOf = asOf,
-                assetPositions = listOf(asset, asset),
-            )
-        }
-
-        assertFailsWith<IllegalArgumentException> {
-            Snapshot.capture(
-                id = SnapshotId.new(),
-                asOf = asOf,
-                liabilityPositions = listOf(liability, liability),
-            )
-        }
-    }
-
-    @Test
-    fun `captures point in time display and liquidity metadata`() {
-        val asset = Asset(AssetId.new(), "Cash", AssetType.CASH, Liquidity.LIQUID)
-        val liability = Liability(LiabilityId.new(), "Mortgage")
-        val assetPosition =
-            SnapshotAssetPosition.capture(asset, valuation(asset.id))
-        val liabilityPosition =
-            SnapshotLiabilityPosition.capture(liability, balance(liability.id))
-
-        assertEquals("Cash", assetPosition.name)
-        assertEquals(AssetType.CASH, assetPosition.type)
-        assertEquals(Liquidity.LIQUID, assetPosition.liquidity)
-        assertEquals("Mortgage", liabilityPosition.name)
     }
 
     @Test
@@ -106,7 +181,6 @@ class SnapshotTest {
                 valuation = valuation(AssetId.new()),
             )
         }
-
         assertFailsWith<IllegalArgumentException> {
             SnapshotLiabilityPosition.of(
                 liabilityId = LiabilityId.new(),
@@ -121,7 +195,7 @@ class SnapshotTest {
         val assetId = AssetId.new()
         val liabilityId = LiabilityId.new()
 
-        val asset =
+        val assetPosition =
             SnapshotAssetPosition.of(
                 assetId = assetId,
                 name = "  Cash  ",
@@ -129,15 +203,15 @@ class SnapshotTest {
                 liquidity = Liquidity.LIQUID,
                 valuation = valuation(assetId),
             )
-        val liability =
+        val liabilityPosition =
             SnapshotLiabilityPosition.of(
                 liabilityId = liabilityId,
                 name = "  Mortgage  ",
                 balance = balance(liabilityId),
             )
 
-        assertEquals("Cash", asset.name)
-        assertEquals("Mortgage", liability.name)
+        assertEquals("Cash", assetPosition.name)
+        assertEquals("Mortgage", liabilityPosition.name)
 
         assertFailsWith<IllegalArgumentException> {
             SnapshotAssetPosition.of(
@@ -160,11 +234,13 @@ class SnapshotTest {
     @Test
     fun `creates an immutable correction that supersedes a prior snapshot`() {
         val original = Snapshot.capture(SnapshotId.new(), asOf)
+        val asset = asset()
+        val replacement = SnapshotAssetPosition.capture(asset, valuation(asset.id))
         val correction =
             Snapshot.correction(
                 id = SnapshotId.new(),
                 supersedes = original,
-                assetPositions = listOf(assetPosition()),
+                assetPositions = listOf(replacement),
             )
 
         assertEquals(original.id, correction.supersedes)
@@ -184,21 +260,17 @@ class SnapshotTest {
         }
     }
 
-    private fun assetPosition(
-        assetId: AssetId = AssetId.new(),
-        effectiveAt: Instant = asOf,
-    ): SnapshotAssetPosition {
-        val asset = Asset(assetId, "Cash", AssetType.CASH, Liquidity.LIQUID)
-        return SnapshotAssetPosition.capture(asset, valuation(assetId, effectiveAt))
-    }
+    private fun asset(
+        id: AssetId = AssetId.new(),
+        name: String = "Cash",
+        type: AssetType = AssetType.CASH,
+        liquidity: Liquidity = Liquidity.LIQUID,
+    ): Asset = Asset(id, name, type, liquidity)
 
-    private fun liabilityPosition(
-        liabilityId: LiabilityId = LiabilityId.new(),
-        effectiveAt: Instant = asOf,
-    ): SnapshotLiabilityPosition {
-        val liability = Liability(liabilityId, "Mortgage")
-        return SnapshotLiabilityPosition.capture(liability, balance(liabilityId, effectiveAt))
-    }
+    private fun liability(
+        id: LiabilityId = LiabilityId.new(),
+        name: String = "Mortgage",
+    ): Liability = Liability(id, name)
 
     private fun valuation(
         assetId: AssetId,

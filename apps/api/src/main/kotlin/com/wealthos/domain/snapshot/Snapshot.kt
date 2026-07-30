@@ -1,5 +1,9 @@
 package com.wealthos.domain.snapshot
 
+import com.wealthos.domain.asset.Asset
+import com.wealthos.domain.asset.AssetValuation
+import com.wealthos.domain.liability.Liability
+import com.wealthos.domain.liability.LiabilityBalance
 import java.time.Instant
 
 class Snapshot private constructor(
@@ -36,16 +40,63 @@ class Snapshot private constructor(
         fun capture(
             id: SnapshotId,
             asOf: Instant,
-            assetPositions: List<SnapshotAssetPosition> = emptyList(),
-            liabilityPositions: List<SnapshotLiabilityPosition> = emptyList(),
-        ): Snapshot =
-            Snapshot(
+            assets: Collection<Asset> = emptyList(),
+            assetValuations: Collection<AssetValuation> = emptyList(),
+            liabilities: Collection<Liability> = emptyList(),
+            liabilityBalances: Collection<LiabilityBalance> = emptyList(),
+        ): Snapshot {
+            val assetsById = assets.associateBy(Asset::id)
+            require(assetsById.size == assets.size) {
+                "Snapshot capture requires unique asset identities"
+            }
+            val valuationsByAssetId = assetValuations.associateBy(AssetValuation::assetId)
+            require(valuationsByAssetId.size == assetValuations.size) {
+                "Snapshot capture requires at most one valuation for each asset"
+            }
+            require(assetsById.keys == valuationsByAssetId.keys) {
+                captureMismatchMessage(
+                    positionType = "asset",
+                    missingIds = assetsById.keys - valuationsByAssetId.keys,
+                    unknownIds = valuationsByAssetId.keys - assetsById.keys,
+                )
+            }
+
+            val liabilitiesById = liabilities.associateBy(Liability::id)
+            require(liabilitiesById.size == liabilities.size) {
+                "Snapshot capture requires unique liability identities"
+            }
+            val balancesByLiabilityId = liabilityBalances.associateBy(LiabilityBalance::liabilityId)
+            require(balancesByLiabilityId.size == liabilityBalances.size) {
+                "Snapshot capture requires at most one balance for each liability"
+            }
+            require(liabilitiesById.keys == balancesByLiabilityId.keys) {
+                captureMismatchMessage(
+                    positionType = "liability",
+                    missingIds = liabilitiesById.keys - balancesByLiabilityId.keys,
+                    unknownIds = balancesByLiabilityId.keys - liabilitiesById.keys,
+                )
+            }
+
+            return Snapshot(
                 id = id,
                 asOf = asOf,
-                assetPositions = assetPositions,
-                liabilityPositions = liabilityPositions,
+                assetPositions =
+                    assets.map { asset ->
+                        SnapshotAssetPosition.capture(
+                            asset = asset,
+                            valuation = valuationsByAssetId.getValue(asset.id),
+                        )
+                    },
+                liabilityPositions =
+                    liabilities.map { liability ->
+                        SnapshotLiabilityPosition.capture(
+                            liability = liability,
+                            balance = balancesByLiabilityId.getValue(liability.id),
+                        )
+                    },
                 supersedes = null,
             )
+        }
 
         fun correction(
             id: SnapshotId,
@@ -60,5 +111,13 @@ class Snapshot private constructor(
                 liabilityPositions = liabilityPositions,
                 supersedes = supersedes.id,
             )
+
+        private fun captureMismatchMessage(
+            positionType: String,
+            missingIds: Set<*>,
+            unknownIds: Set<*>,
+        ): String =
+            "Snapshot capture has incomplete $positionType facts: " +
+                "missing=$missingIds, unknown=$unknownIds"
     }
 }

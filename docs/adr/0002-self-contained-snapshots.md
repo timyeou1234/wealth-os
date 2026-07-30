@@ -30,6 +30,12 @@ A Snapshot owns immutable, self-contained line items:
 Financial-position and financial-structure calculations use only the captured Snapshot.
 They do not consult current Asset or Liability entities.
 
+A normal capture receives the complete in-scope Asset and Liability collections together
+with their point-in-time valuations and balances. Capture fails when a position is missing
+its monetary fact, a fact references an unknown position, or either collection contains a
+duplicate identity. Only after this completeness check does the aggregate freeze
+self-contained line items.
+
 A normal Snapshot has no predecessor. Correcting a saved Snapshot creates a new immutable
 Snapshot with the same `asOf` time and a `supersedes` reference to the Snapshot being
 corrected. The prior Snapshot remains unchanged. The application and persistence layers
@@ -58,6 +64,7 @@ will later validate that the referenced Snapshot exists and manage correction ch
 
 - A Snapshot is immutable after creation.
 - A line item's identity must match its valuation or balance identity.
+- A normal capture has exactly one monetary fact for every in-scope position.
 - No line item may be effective after the Snapshot's `asOf` time.
 - A Snapshot contains at most one line item for each asset or liability identity.
 - A Snapshot cannot supersede itself.
