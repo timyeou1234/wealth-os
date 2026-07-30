@@ -6,13 +6,16 @@ import com.wealthos.domain.asset.AssetType
 import com.wealthos.domain.asset.AssetValuation
 import com.wealthos.domain.asset.Liquidity
 import com.wealthos.domain.asset.ValuationSource
+import com.wealthos.domain.liability.Liability
 import com.wealthos.domain.liability.LiabilityBalance
 import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.Snapshot
+import com.wealthos.domain.snapshot.SnapshotAssetPosition
 import com.wealthos.domain.snapshot.SnapshotId
+import com.wealthos.domain.snapshot.SnapshotLiabilityPosition
 import java.math.BigDecimal
 import java.time.Instant
 import kotlin.test.Test
@@ -25,20 +28,12 @@ class FinancialHealthCalculatorTest {
     private val eur = Currency.of("EUR")
 
     @Test
-    fun `calculates totals net worth debt ratio and liquidity ratio`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
-        val home = asset("Home", Liquidity.ILLIQUID)
-        val snapshot =
-            snapshot(
-                valuations =
-                    listOf(
-                        valuation(cash, "1000.00"),
-                        valuation(home, "3000.00"),
-                    ),
-                balances = listOf(balance("1000.00")),
-            )
+    fun `calculates position and structure from captured snapshot facts`() {
+        val cash = assetPosition("Cash", Liquidity.LIQUID, "1000.00")
+        val home = assetPosition("Home", Liquidity.ILLIQUID, "3000.00")
+        val mortgage = liabilityPosition("Mortgage", "1000.00")
 
-        val health = calculated(snapshot, listOf(cash, home))
+        val health = calculated(snapshot(listOf(cash, home), listOf(mortgage)))
 
         assertEquals(money("4000.00"), health.totalAssets)
         assertEquals(money("1000.00"), health.totalLiabilities)
@@ -49,8 +44,7 @@ class FinancialHealthCalculatorTest {
 
     @Test
     fun `represents zero liabilities as a numeric zero debt ratio`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
-        val health = calculated(snapshot(listOf(valuation(cash, "100.00"))), listOf(cash))
+        val health = calculated(snapshot(listOf(assetPosition("Cash", Liquidity.LIQUID, "100.00"))))
 
         assertEquals(money("0.00"), health.totalLiabilities)
         assertEquals(money("100.00"), health.netWorth)
@@ -59,14 +53,12 @@ class FinancialHealthCalculatorTest {
 
     @Test
     fun `calculates negative net worth`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
         val health =
             calculated(
                 snapshot(
-                    valuations = listOf(valuation(cash, "100.00")),
-                    balances = listOf(balance("150.00")),
+                    assets = listOf(assetPosition("Cash", Liquidity.LIQUID, "100.00")),
+                    liabilities = listOf(liabilityPosition("Loan", "150.00")),
                 ),
-                listOf(cash),
             )
 
         assertEquals(money("-50.00"), health.netWorth)
@@ -74,37 +66,46 @@ class FinancialHealthCalculatorTest {
     }
 
     @Test
-    fun `counts only liquid assets toward liquidity`() {
-        val liquid = asset("Cash", Liquidity.LIQUID)
-        val semiLiquid = asset("Bonds", Liquidity.SEMI_LIQUID)
-        val illiquid = asset("Home", Liquidity.ILLIQUID)
-
-        val fullyLiquid =
-            calculated(
-                snapshot(listOf(valuation(liquid, "100.00"))),
-                listOf(liquid),
-            )
-        val noLiquid =
+    fun `counts only captured liquid assets toward immediate liquidity`() {
+        val health =
             calculated(
                 snapshot(
-                    listOf(
-                        valuation(semiLiquid, "50.00"),
-                        valuation(illiquid, "50.00"),
-                    ),
+                    assets =
+                        listOf(
+                            assetPosition("Cash", Liquidity.LIQUID, "100.00"),
+                            assetPosition("Bonds", Liquidity.SEMI_LIQUID, "50.00"),
+                            assetPosition("Home", Liquidity.ILLIQUID, "50.00"),
+                        ),
                 ),
-                listOf(semiLiquid, illiquid),
             )
 
-        assertEquals(definedRatio("1.000000"), fullyLiquid.liquidityRatio)
-        assertEquals(definedRatio("0.000000"), noLiquid.liquidityRatio)
+        assertEquals(definedRatio("0.500000"), health.liquidityRatio)
+    }
+
+    @Test
+    fun `uses historical liquidity even when current asset metadata differs`() {
+        val assetId = AssetId.new()
+        val historicalAsset =
+            Asset(assetId, "Cash", AssetType.CASH, Liquidity.LIQUID)
+        val valuation = valuation(assetId, "100.00")
+        val captured = SnapshotAssetPosition.capture(historicalAsset, valuation)
+
+        val currentAsset =
+            Asset(assetId, "Restricted cash", AssetType.CASH, Liquidity.ILLIQUID)
+
+        val health = calculated(snapshot(listOf(captured)))
+
+        assertEquals(definedRatio("1.000000"), health.liquidityRatio)
+        assertEquals("Cash", captured.name)
+        assertEquals(Liquidity.LIQUID, captured.liquidity)
+        assertEquals(Liquidity.ILLIQUID, currentAsset.liquidity)
     }
 
     @Test
     fun `represents ratios as undefined when total assets are zero`() {
         val health =
             calculated(
-                snapshot(balances = listOf(balance("100.00"))),
-                emptyList(),
+                snapshot(liabilities = listOf(liabilityPosition("Loan", "100.00"))),
             )
 
         assertEquals(money("0.00"), health.totalAssets)
@@ -115,52 +116,21 @@ class FinancialHealthCalculatorTest {
 
     @Test
     fun `returns insufficient data for an empty snapshot`() {
-        val result = FinancialHealthCalculator.calculate(snapshot(), emptyList())
+        val result = FinancialHealthCalculator.calculate(snapshot())
 
         val insufficient = assertIs<FinancialHealthResult.InsufficientData>(result)
         assertEquals(InsufficientDataReason.EmptySnapshot, insufficient.reason)
     }
 
     @Test
-    fun `returns missing asset identities when valuations are absent`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
-
-        val result = FinancialHealthCalculator.calculate(snapshot(), listOf(cash))
-
-        val insufficient = assertIs<FinancialHealthResult.InsufficientData>(result)
-        assertEquals(
-            InsufficientDataReason.MissingAssetValuations(setOf(cash.id)),
-            insufficient.reason,
-        )
-    }
-
-    @Test
-    fun `returns unknown asset identities when snapshot metadata is absent`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
-
-        val result =
-            FinancialHealthCalculator.calculate(
-                snapshot(listOf(valuation(cash, "100.00"))),
-                emptyList(),
-            )
-
-        val insufficient = assertIs<FinancialHealthResult.InsufficientData>(result)
-        assertEquals(
-            InsufficientDataReason.UnknownAssetValuations(setOf(cash.id)),
-            insufficient.reason,
-        )
-    }
-
-    @Test
     fun `does not combine different currencies`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
         val snapshot =
             snapshot(
-                valuations = listOf(valuation(cash, "100.00")),
-                balances = listOf(balance("50.00", eur)),
+                assets = listOf(assetPosition("Cash", Liquidity.LIQUID, "100.00")),
+                liabilities = listOf(liabilityPosition("Loan", "50.00", eur)),
             )
 
-        val result = FinancialHealthCalculator.calculate(snapshot, listOf(cash))
+        val result = FinancialHealthCalculator.calculate(snapshot)
 
         val insufficient = assertIs<FinancialHealthResult.InsufficientData>(result)
         assertEquals(
@@ -171,14 +141,12 @@ class FinancialHealthCalculatorTest {
 
     @Test
     fun `rounds ratios deterministically to six decimal places`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
         val health =
             calculated(
                 snapshot(
-                    valuations = listOf(valuation(cash, "3.00")),
-                    balances = listOf(balance("1.00")),
+                    assets = listOf(assetPosition("Cash", Liquidity.LIQUID, "3.00")),
+                    liabilities = listOf(liabilityPosition("Loan", "1.00")),
                 ),
-                listOf(cash),
             )
 
         assertEquals(definedRatio("0.333333"), health.debtRatio)
@@ -186,22 +154,19 @@ class FinancialHealthCalculatorTest {
 
     @Test
     fun `uses half even rounding at ratio boundaries`() {
-        val asset = asset("Investment", Liquidity.ILLIQUID)
         val roundsToEvenZero =
             calculated(
                 snapshot(
-                    valuations = listOf(valuation(asset, "2000000.00")),
-                    balances = listOf(balance("1.00")),
+                    assets = listOf(assetPosition("Investment", Liquidity.ILLIQUID, "2000000.00")),
+                    liabilities = listOf(liabilityPosition("Loan", "1.00")),
                 ),
-                listOf(asset),
             )
         val roundsToEvenTwo =
             calculated(
                 snapshot(
-                    valuations = listOf(valuation(asset, "2000000.00")),
-                    balances = listOf(balance("3.00")),
+                    assets = listOf(assetPosition("Investment", Liquidity.ILLIQUID, "2000000.00")),
+                    liabilities = listOf(liabilityPosition("Loan", "3.00")),
                 ),
-                listOf(asset),
             )
 
         assertEquals(definedRatio("0.000000"), roundsToEvenZero.debtRatio)
@@ -209,78 +174,89 @@ class FinancialHealthCalculatorTest {
     }
 
     @Test
-    fun `produces the same result for the same snapshot and metadata`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
+    fun `produces the same result without mutating its snapshot`() {
         val snapshot =
             snapshot(
-                valuations = listOf(valuation(cash, "100.00")),
-                balances = listOf(balance("25.00")),
+                assets = listOf(assetPosition("Cash", Liquidity.LIQUID, "100.00")),
+                liabilities = listOf(liabilityPosition("Loan", "25.00")),
             )
+        val originalAssets = snapshot.assetPositions
+        val originalLiabilities = snapshot.liabilityPositions
 
-        val first = FinancialHealthCalculator.calculate(snapshot, listOf(cash))
-        val second = FinancialHealthCalculator.calculate(snapshot, listOf(cash))
+        val first = FinancialHealthCalculator.calculate(snapshot)
+        val second = FinancialHealthCalculator.calculate(snapshot)
 
         assertEquals(first, second)
+        assertEquals(originalAssets, snapshot.assetPositions)
+        assertEquals(originalLiabilities, snapshot.liabilityPositions)
     }
 
-    @Test
-    fun `does not mutate its source snapshot`() {
-        val cash = asset("Cash", Liquidity.LIQUID)
-        val snapshot = snapshot(listOf(valuation(cash, "100.00")))
-        val originalValuations = snapshot.assetValuations
-        val originalBalances = snapshot.liabilityBalances
-
-        FinancialHealthCalculator.calculate(snapshot, listOf(cash))
-
-        assertEquals(originalValuations, snapshot.assetValuations)
-        assertEquals(originalBalances, snapshot.liabilityBalances)
-    }
-
-    private fun calculated(
-        snapshot: Snapshot,
-        assets: Collection<Asset>,
-    ): FinancialHealth =
+    private fun calculated(snapshot: Snapshot): FinancialHealth =
         assertIs<FinancialHealthResult.Calculated>(
-            FinancialHealthCalculator.calculate(snapshot, assets),
+            FinancialHealthCalculator.calculate(snapshot),
         ).financialHealth
 
     private fun snapshot(
-        valuations: List<AssetValuation> = emptyList(),
-        balances: List<LiabilityBalance> = emptyList(),
-    ): Snapshot = Snapshot.create(SnapshotId.new(), asOf, valuations, balances)
-
-    private fun asset(
-        name: String,
-        liquidity: Liquidity,
-    ): Asset =
-        Asset(
-            id = AssetId.new(),
-            name = name,
-            type = AssetType.OTHER,
-            liquidity = liquidity,
+        assets: List<SnapshotAssetPosition> = emptyList(),
+        liabilities: List<SnapshotLiabilityPosition> = emptyList(),
+    ): Snapshot =
+        Snapshot.capture(
+            id = SnapshotId.new(),
+            asOf = asOf,
+            assets =
+                assets.map {
+                    Asset(it.assetId, it.name, it.type, it.liquidity)
+                },
+            assetValuations = assets.map(SnapshotAssetPosition::valuation),
+            liabilities =
+                liabilities.map {
+                    Liability(it.liabilityId, it.name)
+                },
+            liabilityBalances = liabilities.map(SnapshotLiabilityPosition::balance),
         )
 
+    private fun assetPosition(
+        name: String,
+        liquidity: Liquidity,
+        amount: String,
+        currency: Currency = usd,
+    ): SnapshotAssetPosition {
+        val asset =
+            Asset(
+                id = AssetId.new(),
+                name = name,
+                type = AssetType.OTHER,
+                liquidity = liquidity,
+            )
+        return SnapshotAssetPosition.capture(asset, valuation(asset.id, amount, currency))
+    }
+
+    private fun liabilityPosition(
+        name: String,
+        amount: String,
+        currency: Currency = usd,
+    ): SnapshotLiabilityPosition {
+        val liability = Liability(LiabilityId.new(), name)
+        val balance =
+            LiabilityBalance(
+                liabilityId = liability.id,
+                balance = money(amount, currency),
+                effectiveAt = asOf,
+                source = LiabilitySource.of("manual"),
+            )
+        return SnapshotLiabilityPosition.capture(liability, balance)
+    }
+
     private fun valuation(
-        asset: Asset,
+        assetId: AssetId,
         amount: String,
         currency: Currency = usd,
     ): AssetValuation =
         AssetValuation(
-            assetId = asset.id,
+            assetId = assetId,
             value = money(amount, currency),
             effectiveAt = asOf,
             source = ValuationSource.of("manual"),
-        )
-
-    private fun balance(
-        amount: String,
-        currency: Currency = usd,
-    ): LiabilityBalance =
-        LiabilityBalance(
-            liabilityId = LiabilityId.new(),
-            balance = money(amount, currency),
-            effectiveAt = asOf,
-            source = LiabilitySource.of("manual"),
         )
 
     private fun money(
