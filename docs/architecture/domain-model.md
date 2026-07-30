@@ -30,7 +30,9 @@ snapshot
 ├── Snapshot (aggregate root)
 ├── SnapshotId
 ├── SnapshotAssetPosition
-└── SnapshotLiabilityPosition
+├── SnapshotLiabilityPosition
+├── SnapshotCorrection
+└── CorrectionReason
 
 financialhealth (implemented package; product language is position and structure)
 ├── FinancialHealth
@@ -72,6 +74,10 @@ Snapshot is an immutable point-in-time collection of self-contained asset and li
 positions. Each position freezes the display metadata, monetary fact, effective time, and
 provenance required to display and recalculate history.
 
+`asOf` records when the financial position was true. `recordedAt` separately records when
+Wealth OS captured that immutable record. A Snapshot cannot be recorded before its
+financial `asOf` time.
+
 It enforces:
 
 - A normal capture has exactly one valuation or balance for every in-scope current
@@ -81,6 +87,7 @@ It enforces:
 - At most one position exists for an asset in one snapshot.
 - At most one position exists for a liability in one snapshot.
 - A correction cannot supersede itself.
+- A correction cannot be recorded before the record it supersedes.
 - Input collections are defensively copied.
 
 Snapshot may contain multiple currencies because it records facts rather than silently
@@ -91,9 +98,15 @@ responsible for collecting base-currency facts before calculation.
 Position and structure calculations depend only on a Snapshot. Current Asset or Liability
 metadata must not reinterpret historical names, classifications, or results.
 
-A correction is a new immutable Snapshot with the same `asOf` time whose `supersedes`
-field identifies the prior Snapshot. The original remains unchanged. Existence checks and
-correction-chain rules belong to future application and persistence work.
+A correction is a new immutable Snapshot with the same `asOf` time and explicit
+`SnapshotCorrection` metadata containing its direct predecessor and a non-blank reason.
+It receives complete replacement asset and liability position collections; no default
+collections or patch semantics exist. The original remains unchanged.
+
+Correction history is a linear chain. Application and persistence work must validate that
+the predecessor exists and is the current terminal record, reject cycles, enforce at most
+one direct successor, and resolve the chain's terminal record as the effective correction.
+These history-wide checks cannot be performed by one aggregate in isolation.
 
 ## Financial-position and structure calculations
 

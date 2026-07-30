@@ -83,10 +83,10 @@ See the [architecture overview](docs/architecture/overview.md) and
 
 1. **Foundation — Complete:** repository workflow, product vision, modular-monolith ADR,
    Kotlin build, core financial facts, and initial calculation engine.
-2. **Product convergence — In progress:** align MVP language, valuation policy, snapshot
-   comparison, provenance, and domain boundaries before persistence.
-3. **Data design:** snapshot reproducibility, correction semantics, PostgreSQL schema,
-   repository ports, and persistence adapters.
+2. **Product convergence — In progress:** align snapshot comparison, structured valuation
+   provenance, and remaining domain language before persistence.
+3. **Data design — In progress:** snapshot reproducibility and correction semantics are
+   defined; next are PostgreSQL schema, repository ports, and persistence adapters.
 4. **API design:** resources, DTOs, OpenAPI conventions, and generated-client workflow.
 5. **First vertical slice:** manual entry, current position and structure, saved snapshots,
    basic snapshot comparison, and the web dashboard.
@@ -119,10 +119,11 @@ Product definition and the first Kotlin domain foundation are implemented. The r
 contains immutable monetary facts, assets, liabilities, snapshots, and deterministic
 financial calculations with automated tests.
 
-The current work is converging the MVP and domain rules before persistence and HTTP APIs.
-Open decisions that must be resolved in or immediately after this phase include
-point-in-time metadata for reproducible historical structure calculations, snapshot
-correction semantics, and persistence design. No web vertical slice exists yet.
+The current work is completing domain convergence before persistence and HTTP APIs.
+Snapshots now preserve point-in-time metadata and distinguish financial time from audit
+time; corrections are immutable, attributable full replacements. Remaining work includes
+structured valuation provenance, correction-chain persistence constraints, and database
+schema design. No web vertical slice exists yet.
 
 ## License
 

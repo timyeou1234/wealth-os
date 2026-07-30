@@ -15,3 +15,4 @@ ADRs are superseded by a new ADR rather than silently rewritten.
 - [ADR-003: Model core financial facts with domain-driven design](0003-domain-driven-design.md)
 - [ADR-004: Organize the backend by business capability](0004-package-by-business-capability.md)
 - [ADR-005: Represent money as a currency-aware value object](0005-money-value-object.md)
+- [ADR-006: Record auditable snapshot corrections](0006-auditable-snapshot-corrections.md)
