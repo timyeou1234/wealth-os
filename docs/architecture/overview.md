@@ -96,8 +96,8 @@ documented. Before production data is introduced, the project must define:
 
 Before persistence begins, the project must resolve or record:
 
-- How snapshots preserve point-in-time descriptive metadata, including liquidity
-- Snapshot creation and correction semantics
+- Persistence enforcement for linear snapshot-correction chains and latest-revision
+  selection
 - Database ownership and schema conventions
 - Authentication and deployment threat model
 - Observability and audit requirements
