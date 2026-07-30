@@ -28,7 +28,9 @@ liability
 
 snapshot
 ├── Snapshot (aggregate root)
-└── SnapshotId
+├── SnapshotId
+├── SnapshotAssetPosition
+└── SnapshotLiabilityPosition
 
 financialhealth (implemented package; product language is position and structure)
 ├── FinancialHealth
@@ -66,14 +68,17 @@ timezone ambiguity in financial facts.
 
 ## Snapshot aggregate
 
-Snapshot is an immutable point-in-time collection of asset valuations and liability
-balances. Both facts carry an effective time and identifiable provenance.
+Snapshot is an immutable point-in-time collection of self-contained asset and liability
+positions. Each position freezes the display metadata, monetary fact, effective time, and
+provenance required to display and recalculate history.
 
 It enforces:
 
 - No fact may be effective after the snapshot's `asOf` time.
-- At most one valuation exists for an asset in one snapshot.
-- At most one balance exists for a liability in one snapshot.
+- A position identity must match the identity of its valuation or balance.
+- At most one position exists for an asset in one snapshot.
+- At most one position exists for a liability in one snapshot.
+- A correction cannot supersede itself.
 - Input collections are defensively copied.
 
 Snapshot may contain multiple currencies because it records facts rather than silently
@@ -81,10 +86,12 @@ normalizing them. Position and structure calculations return an explicit
 insufficient-data result for mixed-currency inputs. MVP application use cases are
 responsible for collecting base-currency facts before calculation.
 
-The current Snapshot stores values and provenance but receives Asset metadata separately
-for structure calculations. Persistence must preserve or embed point-in-time liquidity
-metadata before historical structure results can be considered reproducible. Current
-Asset metadata must not be used to silently reinterpret an older snapshot.
+Position and structure calculations depend only on a Snapshot. Current Asset or Liability
+metadata must not reinterpret historical names, classifications, or results.
+
+A correction is a new immutable Snapshot with the same `asOf` time whose `supersedes`
+field identifies the prior Snapshot. The original remains unchanged. Existence checks and
+correction-chain rules belong to future application and persistence work.
 
 ## Financial-position and structure calculations
 

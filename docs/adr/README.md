@@ -11,3 +11,4 @@ ADR rather than silently rewritten.
 ## Index
 
 - [ADR-001: Begin with a modular monolith](0001-modular-monolith.md)
+- [ADR-002: Capture self-contained historical snapshots](0002-self-contained-snapshots.md)
