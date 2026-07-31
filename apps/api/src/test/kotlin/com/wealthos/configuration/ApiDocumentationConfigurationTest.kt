@@ -41,6 +41,14 @@ class ApiDocumentationConfigurationTest {
                 jsonPath("$.paths['/api/v1/assets'].post.responses['400'].content['application/problem+json']") {
                     exists()
                 }
+                jsonPath(
+                    "$.paths['/api/v1/assets'].post.responses['400'].content['application/problem+json'].schema['\$ref']",
+                ) {
+                    value("#/components/schemas/ValidationProblemResponse")
+                }
+                jsonPath("$.components.schemas.ValidationProblemResponse.properties.errors") { exists() }
+                jsonPath("$.components.schemas.FieldValidationError.properties.field") { exists() }
+                jsonPath("$.components.schemas.FieldValidationError.properties.message") { exists() }
                 jsonPath("$.paths['/api/v1/assets'].post.responses['200']") { doesNotExist() }
                 jsonPath("$.paths['/api/v1/assets/{id}'].get.responses['200']") { exists() }
                 jsonPath("$.paths['/api/v1/assets/{id}'].get.responses['404'].content['application/problem+json']") {

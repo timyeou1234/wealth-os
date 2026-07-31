@@ -35,3 +35,12 @@ data class FieldValidationError(
     val field: String,
     val message: String,
 )
+
+data class ValidationProblemResponse(
+    val type: URI,
+    val title: String,
+    val status: Int,
+    val detail: String,
+    val instance: URI,
+    val errors: List<FieldValidationError>,
+)

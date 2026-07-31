@@ -7,6 +7,7 @@ import com.wealthos.asset.domain.Asset
 import com.wealthos.asset.domain.AssetId
 import com.wealthos.asset.domain.AssetType
 import com.wealthos.asset.domain.Liquidity
+import com.wealthos.shared.adapter.http.ValidationProblemResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -70,7 +71,12 @@ class AssetController(
             ApiResponse(
                 responseCode = "400",
                 description = "Request validation failed",
-                content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ProblemDetail::class))],
+                content = [
+                    Content(
+                        mediaType = "application/problem+json",
+                        schema = Schema(implementation = ValidationProblemResponse::class),
+                    ),
+                ],
             ),
         ],
     )
