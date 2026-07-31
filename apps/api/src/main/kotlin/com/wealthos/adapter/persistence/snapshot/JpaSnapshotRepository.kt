@@ -5,6 +5,7 @@ import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotRepository
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.util.UUID
 
 @Repository
@@ -44,13 +45,31 @@ class JpaSnapshotRepository(
         snapshots.findById(id.value).orElse(null)?.let(::load)
 
     @Transactional(readOnly = true)
-    override fun findEffectiveById(id: SnapshotId): Snapshot? {
-        var current = snapshots.findById(id.value).orElse(null) ?: return null
+    override fun findEffectiveById(id: SnapshotId): Snapshot? =
+        snapshots.findById(id.value).orElse(null)?.let { load(findTerminal(it)) }
+
+    @Transactional(readOnly = true)
+    override fun findEffectiveBetween(
+        fromInclusive: Instant,
+        toExclusive: Instant,
+    ): List<Snapshot> {
+        require(fromInclusive.isBefore(toExclusive)) {
+            "Snapshot history start must be before its end"
+        }
+        return snapshots
+            .findAllBySupersedesIdIsNullAndAsOfGreaterThanEqualAndAsOfLessThanOrderByAsOfAsc(
+                fromInclusive,
+                toExclusive,
+            ).map { load(findTerminal(it)) }
+    }
+
+    private fun findTerminal(start: SnapshotJpaEntity): SnapshotJpaEntity {
+        var current = start
         val visited = mutableSetOf<UUID>()
 
         while (true) {
             check(visited.add(current.id)) { "Snapshot correction chain contains a cycle" }
-            current = snapshots.findBySupersedesId(current.id) ?: return load(current)
+            current = snapshots.findBySupersedesId(current.id) ?: return current
         }
     }
 
