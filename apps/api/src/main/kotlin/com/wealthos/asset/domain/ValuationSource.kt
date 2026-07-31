@@ -1,4 +1,4 @@
-package com.wealthos.domain.asset
+package com.wealthos.asset.domain
 
 @JvmInline
 value class ValuationSource private constructor(val value: String) {

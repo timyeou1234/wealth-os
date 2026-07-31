@@ -1,7 +1,7 @@
-package com.wealthos.adapter.http.asset
+package com.wealthos.asset.adapter.http
 
-import com.wealthos.application.asset.ListAssets
-import com.wealthos.domain.asset.Asset
+import com.wealthos.asset.application.ListAssets
+import com.wealthos.asset.domain.Asset
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.GetMapping

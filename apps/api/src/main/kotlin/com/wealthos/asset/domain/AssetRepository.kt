@@ -1,4 +1,4 @@
-package com.wealthos.domain.asset
+package com.wealthos.asset.domain
 
 interface AssetRepository {
     fun save(asset: Asset): Asset

@@ -1,4 +1,4 @@
-package com.wealthos.adapter.persistence.asset
+package com.wealthos.asset.adapter.persistence
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

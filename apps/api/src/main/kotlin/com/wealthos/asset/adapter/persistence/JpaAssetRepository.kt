@@ -1,10 +1,10 @@
-package com.wealthos.adapter.persistence.asset
+package com.wealthos.asset.adapter.persistence
 
-import com.wealthos.domain.asset.Asset
-import com.wealthos.domain.asset.AssetId
-import com.wealthos.domain.asset.AssetRepository
-import com.wealthos.domain.asset.AssetType
-import com.wealthos.domain.asset.Liquidity
+import com.wealthos.asset.domain.Asset
+import com.wealthos.asset.domain.AssetId
+import com.wealthos.asset.domain.AssetRepository
+import com.wealthos.asset.domain.AssetType
+import com.wealthos.asset.domain.Liquidity
 import org.springframework.stereotype.Repository
 
 @Repository

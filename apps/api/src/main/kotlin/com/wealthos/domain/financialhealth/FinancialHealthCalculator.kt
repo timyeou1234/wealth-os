@@ -1,6 +1,6 @@
 package com.wealthos.domain.financialhealth
 
-import com.wealthos.domain.asset.Liquidity
+import com.wealthos.asset.domain.Liquidity
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.Snapshot

@@ -1,7 +1,7 @@
 package com.wealthos.domain.snapshot
 
-import com.wealthos.domain.asset.Asset
-import com.wealthos.domain.asset.AssetValuation
+import com.wealthos.asset.domain.Asset
+import com.wealthos.asset.domain.AssetValuation
 import com.wealthos.domain.liability.Liability
 import com.wealthos.domain.liability.LiabilityBalance
 import java.time.Instant

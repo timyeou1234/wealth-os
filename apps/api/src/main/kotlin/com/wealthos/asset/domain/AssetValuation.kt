@@ -1,4 +1,4 @@
-package com.wealthos.domain.asset
+package com.wealthos.asset.domain
 
 import com.wealthos.domain.shared.Money
 import java.time.Instant

@@ -1,7 +1,7 @@
-package com.wealthos.application.asset
+package com.wealthos.asset.application
 
-import com.wealthos.domain.asset.Asset
-import com.wealthos.domain.asset.AssetRepository
+import com.wealthos.asset.domain.Asset
+import com.wealthos.asset.domain.AssetRepository
 import org.springframework.stereotype.Service
 
 @Service

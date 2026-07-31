@@ -1,4 +1,4 @@
-package com.wealthos.domain.asset
+package com.wealthos.asset.domain
 
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
