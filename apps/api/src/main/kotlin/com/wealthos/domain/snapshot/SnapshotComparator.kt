@@ -37,6 +37,8 @@ object SnapshotComparator {
                 totalLiabilitiesChange = laterLiabilities - earlierLiabilities,
                 netWorthChange =
                     (laterAssets - laterLiabilities) - (earlierAssets - earlierLiabilities),
+                assetChanges = assetChanges(earlier, later, currency),
+                liabilityChanges = liabilityChanges(earlier, later, currency),
             ),
         )
     }
@@ -45,6 +47,80 @@ object SnapshotComparator {
         buildSet {
             snapshot.assetPositions.mapTo(this) { it.valuation.value.currency }
             snapshot.liabilityPositions.mapTo(this) { it.balance.balance.currency }
+        }
+
+    private fun assetChanges(
+        earlier: Snapshot,
+        later: Snapshot,
+        currency: Currency,
+    ): List<AssetPositionChange> {
+        val before = earlier.assetPositions.associateBy(SnapshotAssetPosition::assetId)
+        val after = later.assetPositions.associateBy(SnapshotAssetPosition::assetId)
+        return (before.keys + after.keys)
+            .sortedBy { it.value.toString() }
+            .mapNotNull { id ->
+                val previous = before[id]
+                val current = after[id]
+                val previousValue = previous?.valuation?.value
+                val currentValue = current?.valuation?.value
+                if (previousValue == currentValue) {
+                    null
+                } else {
+                    AssetPositionChange(
+                        assetId = id,
+                        type = changeType(previous, current),
+                        previousName = previous?.name,
+                        currentName = current?.name,
+                        previousValue = previousValue,
+                        currentValue = currentValue,
+                        valueChange =
+                            (currentValue ?: Money.zero(currency)) -
+                                (previousValue ?: Money.zero(currency)),
+                    )
+                }
+            }
+    }
+
+    private fun liabilityChanges(
+        earlier: Snapshot,
+        later: Snapshot,
+        currency: Currency,
+    ): List<LiabilityPositionChange> {
+        val before = earlier.liabilityPositions.associateBy(SnapshotLiabilityPosition::liabilityId)
+        val after = later.liabilityPositions.associateBy(SnapshotLiabilityPosition::liabilityId)
+        return (before.keys + after.keys)
+            .sortedBy { it.value.toString() }
+            .mapNotNull { id ->
+                val previous = before[id]
+                val current = after[id]
+                val previousBalance = previous?.balance?.balance
+                val currentBalance = current?.balance?.balance
+                if (previousBalance == currentBalance) {
+                    null
+                } else {
+                    LiabilityPositionChange(
+                        liabilityId = id,
+                        type = changeType(previous, current),
+                        previousName = previous?.name,
+                        currentName = current?.name,
+                        previousBalance = previousBalance,
+                        currentBalance = currentBalance,
+                        balanceChange =
+                            (currentBalance ?: Money.zero(currency)) -
+                                (previousBalance ?: Money.zero(currency)),
+                    )
+                }
+            }
+    }
+
+    private fun changeType(
+        previous: Any?,
+        current: Any?,
+    ): PositionChangeType =
+        when {
+            previous == null -> PositionChangeType.ADDED
+            current == null -> PositionChangeType.REMOVED
+            else -> PositionChangeType.CHANGED
         }
 
     private inline fun <T> Iterable<T>.sumOfMoney(
