@@ -132,6 +132,23 @@ class Snapshot private constructor(
             )
         }
 
+        fun reconstitute(
+            id: SnapshotId,
+            asOf: Instant,
+            recordedAt: Instant,
+            assetPositions: Collection<SnapshotAssetPosition>,
+            liabilityPositions: Collection<SnapshotLiabilityPosition>,
+            correction: SnapshotCorrection?,
+        ): Snapshot =
+            Snapshot(
+                id = id,
+                asOf = asOf,
+                recordedAt = recordedAt,
+                assetPositions = assetPositions.toList(),
+                liabilityPositions = liabilityPositions.toList(),
+                correction = correction,
+            )
+
         private fun captureMismatchMessage(
             positionType: String,
             missingIds: Set<*>,

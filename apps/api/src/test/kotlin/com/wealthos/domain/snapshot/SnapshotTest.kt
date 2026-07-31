@@ -317,6 +317,43 @@ class SnapshotTest {
     }
 
     @Test
+    fun `reconstitutes an immutable snapshot from persisted facts`() {
+        val asset = asset()
+        val liability = liability()
+        val assetPositions =
+            mutableListOf(
+                SnapshotAssetPosition.capture(asset, valuation(asset.id)),
+            )
+        val liabilityPositions =
+            mutableListOf(
+                SnapshotLiabilityPosition.capture(liability, balance(liability.id)),
+            )
+        val predecessorId = SnapshotId.new()
+
+        val restored =
+            Snapshot.reconstitute(
+                id = SnapshotId.new(),
+                asOf = asOf,
+                recordedAt = recordedAt,
+                assetPositions = assetPositions,
+                liabilityPositions = liabilityPositions,
+                correction =
+                    SnapshotCorrection(
+                        supersedes = predecessorId,
+                        reason = CorrectionReason.of("Corrected persisted facts"),
+                    ),
+            )
+
+        assetPositions.clear()
+        liabilityPositions.clear()
+
+        assertEquals(predecessorId, restored.supersedes)
+        assertEquals("Corrected persisted facts", restored.correction?.reason?.value)
+        assertEquals("Cash", restored.assetPositions.single().name)
+        assertEquals("Mortgage", restored.liabilityPositions.single().name)
+    }
+
+    @Test
     fun `rejects blank correction reasons`() {
         assertFailsWith<IllegalArgumentException> {
             CorrectionReason.of(" ")
