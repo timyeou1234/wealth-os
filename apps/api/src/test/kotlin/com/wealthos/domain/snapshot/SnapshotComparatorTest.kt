@@ -26,6 +26,7 @@ class SnapshotComparatorTest {
     fun `compares changes in assets liabilities and net worth`() {
         val changedAssetId = AssetId.new()
         val removedAssetId = AssetId.new()
+        val unchangedAssetId = AssetId.new()
         val changedLiabilityId = LiabilityId.new()
         val earlier =
             snapshot(
@@ -34,6 +35,7 @@ class SnapshotComparatorTest {
                     listOf(
                         asset(changedAssetId, "Cash", "100.00", earlierTime),
                         asset(removedAssetId, "Old investment", "50.00", earlierTime),
+                        asset(unchangedAssetId, "Home", "25.00", earlierTime),
                     ),
                 liabilities = listOf(liability(changedLiabilityId, "Mortgage", "40.00", earlierTime)),
             )
@@ -44,6 +46,7 @@ class SnapshotComparatorTest {
                     listOf(
                         asset(changedAssetId, "Cash", "120.00", laterTime),
                         asset(AssetId.new(), "New investment", "30.00", laterTime),
+                        asset(unchangedAssetId, "Home", "25.00", laterTime),
                     ),
                 liabilities =
                     listOf(
@@ -57,6 +60,23 @@ class SnapshotComparatorTest {
         assertEquals(money("0.00"), comparison.totalAssetsChange)
         assertEquals(money("20.00"), comparison.totalLiabilitiesChange)
         assertEquals(money("-20.00"), comparison.netWorthChange)
+        assertEquals(
+            setOf(PositionChangeType.ADDED, PositionChangeType.REMOVED, PositionChangeType.CHANGED),
+            comparison.assetChanges.map(AssetPositionChange::type).toSet(),
+        )
+        assertEquals(
+            setOf(PositionChangeType.ADDED, PositionChangeType.CHANGED),
+            comparison.liabilityChanges.map(LiabilityPositionChange::type).toSet(),
+        )
+        assertEquals(
+            money("20.00"),
+            comparison.assetChanges.single { it.assetId == changedAssetId }.valueChange,
+        )
+        assertEquals(
+            money("-50.00"),
+            comparison.assetChanges.single { it.assetId == removedAssetId }.valueChange,
+        )
+        assertEquals(false, comparison.assetChanges.any { it.assetId == unchangedAssetId })
     }
 
     @Test
