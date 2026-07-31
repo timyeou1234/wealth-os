@@ -1,6 +1,6 @@
 package com.wealthos.domain.snapshot
 
-import com.wealthos.domain.asset.AssetId
+import com.wealthos.asset.domain.AssetId
 import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money

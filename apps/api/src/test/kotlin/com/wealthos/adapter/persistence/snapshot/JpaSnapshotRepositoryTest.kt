@@ -1,11 +1,11 @@
 package com.wealthos.adapter.persistence.snapshot
 
-import com.wealthos.domain.asset.Asset
-import com.wealthos.domain.asset.AssetId
-import com.wealthos.domain.asset.AssetType
-import com.wealthos.domain.asset.AssetValuation
-import com.wealthos.domain.asset.Liquidity
-import com.wealthos.domain.asset.ValuationSource
+import com.wealthos.asset.domain.Asset
+import com.wealthos.asset.domain.AssetId
+import com.wealthos.asset.domain.AssetType
+import com.wealthos.asset.domain.AssetValuation
+import com.wealthos.asset.domain.Liquidity
+import com.wealthos.asset.domain.ValuationSource
 import com.wealthos.domain.liability.Liability
 import com.wealthos.domain.liability.LiabilityBalance
 import com.wealthos.domain.liability.LiabilityId

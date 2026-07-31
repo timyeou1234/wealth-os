@@ -1,4 +1,4 @@
-package com.wealthos.domain.asset
+package com.wealthos.asset.domain
 
 class Asset(
     val id: AssetId,

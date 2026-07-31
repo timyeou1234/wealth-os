@@ -1,10 +1,10 @@
 package com.wealthos.domain.snapshot
 
-import com.wealthos.domain.asset.Asset
-import com.wealthos.domain.asset.AssetId
-import com.wealthos.domain.asset.AssetType
-import com.wealthos.domain.asset.AssetValuation
-import com.wealthos.domain.asset.Liquidity
+import com.wealthos.asset.domain.Asset
+import com.wealthos.asset.domain.AssetId
+import com.wealthos.asset.domain.AssetType
+import com.wealthos.asset.domain.AssetValuation
+import com.wealthos.asset.domain.Liquidity
 import kotlin.ConsistentCopyVisibility
 
 @ConsistentCopyVisibility
