@@ -143,7 +143,11 @@ report:
 - changes in total assets, total liabilities, and net worth;
 - changed values for matching asset and liability identities;
 - positions added or removed between snapshots; and
-- facts whose effective dates indicate stale data.
+- the previous and current effective dates for every reported position change.
 
 It must not claim investment performance or causal attribution. Those require transaction,
 cash-flow, market-price, and FX data outside the MVP.
+
+Comparison does not classify facts as stale. Position types have materially different
+update cadences, so consumers display the captured effective dates and sources rather than
+applying one domain-wide expiration threshold.

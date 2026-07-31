@@ -4,6 +4,7 @@ import com.wealthos.domain.asset.AssetId
 import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
+import java.time.Instant
 
 data class SnapshotComparison(
     val earlierSnapshotId: SnapshotId,
@@ -28,6 +29,8 @@ data class AssetPositionChange(
     val currentName: String?,
     val previousValue: Money?,
     val currentValue: Money?,
+    val previousEffectiveAt: Instant?,
+    val currentEffectiveAt: Instant?,
     val valueChange: Money,
 )
 
@@ -38,6 +41,8 @@ data class LiabilityPositionChange(
     val currentName: String?,
     val previousBalance: Money?,
     val currentBalance: Money?,
+    val previousEffectiveAt: Instant?,
+    val currentEffectiveAt: Instant?,
     val balanceChange: Money,
 )
 

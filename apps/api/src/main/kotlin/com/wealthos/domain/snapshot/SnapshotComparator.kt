@@ -73,6 +73,8 @@ object SnapshotComparator {
                         currentName = current?.name,
                         previousValue = previousValue,
                         currentValue = currentValue,
+                        previousEffectiveAt = previous?.valuation?.effectiveAt,
+                        currentEffectiveAt = current?.valuation?.effectiveAt,
                         valueChange =
                             (currentValue ?: Money.zero(currency)) -
                                 (previousValue ?: Money.zero(currency)),
@@ -105,6 +107,8 @@ object SnapshotComparator {
                         currentName = current?.name,
                         previousBalance = previousBalance,
                         currentBalance = currentBalance,
+                        previousEffectiveAt = previous?.balance?.effectiveAt,
+                        currentEffectiveAt = current?.balance?.effectiveAt,
                         balanceChange =
                             (currentBalance ?: Money.zero(currency)) -
                                 (previousBalance ?: Money.zero(currency)),

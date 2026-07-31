@@ -64,11 +64,16 @@ The first release should allow a financially engaged individual to answer:
 - Preserve historical values without silently replacing them with current values.
 - Compare two snapshots using changes in total assets, total liabilities, net worth, and
   matching asset and liability items.
-- Mark added, removed, and stale items explicitly.
+- Mark added, removed, and changed items explicitly.
+- Display each fact's effective date and source so the user can judge its freshness.
 
 Basic comparison describes recorded value changes. It does not attribute a change to
 market performance, deposits, withdrawals, income, spending, or foreign-exchange
 performance.
+
+The MVP does not automatically label facts as stale. Appropriate update frequency varies
+by position: a property estimate may remain useful far longer than a cash balance. The UI
+will present effective dates without applying one universal expiration threshold.
 
 ### MVP position boundary
 
