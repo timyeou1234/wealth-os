@@ -52,8 +52,27 @@ its currency.
 - Invalid client input returns an appropriate `4xx` status and an
   `application/problem+json` body based on RFC 9457 Problem Details.
 - The response includes a stable problem `type`, a short `title`, the HTTP `status`, and
-  actionable `detail`. Field-level validation errors will be defined with the first
-  write endpoint.
+  actionable `detail`.
+- Field validation failures use the stable type
+  `urn:wealthos:problem:validation-error` and include an `errors` array. Each entry
+  identifies the invalid `field` and a user-actionable `message`:
+
+```json
+{
+  "type": "urn:wealthos:problem:validation-error",
+  "title": "Request validation failed",
+  "status": 400,
+  "detail": "One or more fields are invalid",
+  "instance": "/api/v1/assets",
+  "errors": [
+    {
+      "field": "name",
+      "message": "must not be blank"
+    }
+  ]
+}
+```
+
 - Unexpected server failures return `5xx` without exposing stack traces, credentials, or
   personal financial data.
 
