@@ -38,3 +38,16 @@ to calculations, validation, permissions, or data transformations.
 - TDD may be skipped for documentation, formatting, generated files, non-behavioral
   configuration, and explicitly disposable prototypes. For other skipped behavioral
   changes, state the reason and use the closest practical verification method.
+
+## Code review
+
+Before opening or marking a pull request ready for review, use the repository's
+`code-review` skill for product and code changes.
+
+- Compare the branch against the merge base of the remote default branch.
+- Review repository standards and the originating Issue or specification as separate
+  axes so one cannot mask problems in the other.
+- Report actionable findings first with severity and tight file/line context.
+- Do not silently modify code while reviewing. Apply fixes only when the user asks.
+- Documentation-only and agent-workflow changes may use a single-pass review, but must
+  still check scope, instruction consistency, broken references, and validation evidence.
