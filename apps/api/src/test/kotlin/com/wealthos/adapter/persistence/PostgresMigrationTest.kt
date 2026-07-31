@@ -9,6 +9,9 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
+import java.math.BigDecimal
+import java.time.Instant
+import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -28,13 +31,28 @@ class PostgresMigrationTest
                     select table_name
                     from information_schema.tables
                     where table_schema = 'public'
-                      and table_name in ('assets', 'liabilities')
+                      and table_name in (
+                          'assets',
+                          'liabilities',
+                          'snapshots',
+                          'snapshot_asset_positions',
+                          'snapshot_liability_positions'
+                      )
                     order by table_name
                     """.trimIndent(),
                     String::class.java,
                 )
 
-            assertEquals(listOf("assets", "liabilities"), tables)
+            assertEquals(
+                listOf(
+                    "assets",
+                    "liabilities",
+                    "snapshot_asset_positions",
+                    "snapshot_liability_positions",
+                    "snapshots",
+                ),
+                tables,
+            )
             assertFailsWith<DataIntegrityViolationException> {
                 jdbc.update(
                     "insert into assets (id, name, asset_type, liquidity) values (?, ?, ?, ?)",
@@ -44,6 +62,103 @@ class PostgresMigrationTest
                     "LIQUID",
                 )
             }
+        }
+
+        @Test
+        fun `snapshot schema preserves immutable facts and a linear correction chain`() {
+            val originalId = UUID.randomUUID()
+            val correctionId = UUID.randomUUID()
+            val asOf = Instant.parse("2026-01-31T00:00:00Z")
+
+            insertSnapshot(originalId, asOf, asOf)
+            insertSnapshot(
+                id = correctionId,
+                asOf = asOf,
+                recordedAt = asOf.plusSeconds(60),
+                supersedesId = originalId,
+                correctionReason = "Corrected bank balance",
+            )
+
+            assertFailsWith<DataIntegrityViolationException> {
+                insertSnapshot(
+                    id = UUID.randomUUID(),
+                    asOf = asOf,
+                    recordedAt = asOf.plusSeconds(120),
+                    supersedesId = originalId,
+                    correctionReason = "Competing correction",
+                )
+            }
+            assertFailsWith<DataIntegrityViolationException> {
+                insertSnapshot(
+                    id = UUID.randomUUID(),
+                    asOf = asOf,
+                    recordedAt = asOf,
+                    correctionReason = "Reason without predecessor",
+                )
+            }
+
+            val assetId = UUID.randomUUID()
+            insertAssetPosition(originalId, assetId, asOf)
+
+            assertFailsWith<DataIntegrityViolationException> {
+                insertAssetPosition(originalId, assetId, asOf)
+            }
+        }
+
+        private fun insertAssetPosition(
+            snapshotId: UUID,
+            assetId: UUID,
+            effectiveAt: Instant,
+        ) {
+            jdbc.update(
+                """
+                insert into snapshot_asset_positions (
+                    snapshot_id,
+                    asset_id,
+                    name,
+                    asset_type,
+                    liquidity,
+                    amount,
+                    currency,
+                    effective_at,
+                    source
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                snapshotId,
+                assetId,
+                "Emergency fund",
+                "CASH",
+                "LIQUID",
+                BigDecimal("1000.00"),
+                "USD",
+                effectiveAt.atOffset(ZoneOffset.UTC),
+                "Manual entry",
+            )
+        }
+
+        private fun insertSnapshot(
+            id: UUID,
+            asOf: Instant,
+            recordedAt: Instant,
+            supersedesId: UUID? = null,
+            correctionReason: String? = null,
+        ) {
+            jdbc.update(
+                """
+                insert into snapshots (
+                    id,
+                    as_of,
+                    recorded_at,
+                    supersedes_id,
+                    correction_reason
+                ) values (?, ?, ?, ?, ?)
+                """.trimIndent(),
+                id,
+                asOf.atOffset(ZoneOffset.UTC),
+                recordedAt.atOffset(ZoneOffset.UTC),
+                supersedesId,
+                correctionReason,
+            )
         }
 
         companion object {
