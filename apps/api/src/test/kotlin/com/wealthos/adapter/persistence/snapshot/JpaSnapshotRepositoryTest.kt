@@ -64,6 +64,22 @@ class JpaSnapshotRepositoryTest
         }
 
         @Test
+        fun `returns effective snapshots within a financial time range`() {
+            val first = snapshot(asOf.minusSeconds(120))
+            val second = snapshot(asOf.minusSeconds(60))
+            val correctedSecond = correction(second, "Corrected timeline balance")
+            val outsideRange = snapshot(asOf)
+            listOf(first, second, correctedSecond, outsideRange).forEach(repository::save)
+
+            val history = repository.findEffectiveBetween(first.asOf, outsideRange.asOf)
+
+            assertEquals(listOf(first.id, correctedSecond.id), history.map(Snapshot::id))
+            assertFailsWith<IllegalArgumentException> {
+                repository.findEffectiveBetween(outsideRange.asOf, outsideRange.asOf)
+            }
+        }
+
+        @Test
         fun `rejects identity reuse missing predecessors and correction branches`() {
             val original = snapshot()
             repository.save(original)
@@ -83,20 +99,20 @@ class JpaSnapshotRepositoryTest
             }
         }
 
-        private fun snapshot(): Snapshot {
+        private fun snapshot(snapshotAsOf: Instant = asOf): Snapshot {
             val asset = Asset(AssetId.new(), "Emergency fund", AssetType.CASH, Liquidity.LIQUID)
             val liability = Liability(LiabilityId.new(), "Mortgage")
             return Snapshot.capture(
                 id = SnapshotId.new(),
-                asOf = asOf,
-                recordedAt = asOf,
+                asOf = snapshotAsOf,
+                recordedAt = snapshotAsOf,
                 assets = listOf(asset),
                 assetValuations =
                     listOf(
                         AssetValuation(
                             assetId = asset.id,
                             value = Money.of(BigDecimal("1200.00"), Currency.of("USD")),
-                            effectiveAt = asOf,
+                            effectiveAt = snapshotAsOf,
                             source = ValuationSource.of("Bank statement"),
                         ),
                     ),
@@ -106,7 +122,7 @@ class JpaSnapshotRepositoryTest
                         LiabilityBalance(
                             liabilityId = liability.id,
                             balance = Money.of(BigDecimal("800.00"), Currency.of("USD")),
-                            effectiveAt = asOf,
+                            effectiveAt = snapshotAsOf,
                             source = LiabilitySource.of("Loan statement"),
                         ),
                     ),
