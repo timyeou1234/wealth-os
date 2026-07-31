@@ -73,6 +73,9 @@ its currency.
 }
 ```
 
+- A request for an Asset identifier that does not exist returns `404` with problem type
+  `urn:wealthos:problem:asset-not-found`. The `detail` identifies the missing Asset, and
+  `instance` contains the requested resource path.
 - Unexpected server failures return `5xx` without exposing stack traces, credentials, or
   personal financial data.
 

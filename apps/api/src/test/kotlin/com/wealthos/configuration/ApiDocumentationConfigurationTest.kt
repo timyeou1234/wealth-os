@@ -31,4 +31,21 @@ class ApiDocumentationConfigurationTest {
                 content { string(containsString("\"version\":\"v1\"")) }
             }
     }
+
+    @Test
+    fun `documents asset creation success and validation responses`() {
+        mockMvc.get("/v3/api-docs")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.paths['/api/v1/assets'].post.responses['201']") { exists() }
+                jsonPath("$.paths['/api/v1/assets'].post.responses['400'].content['application/problem+json']") {
+                    exists()
+                }
+                jsonPath("$.paths['/api/v1/assets'].post.responses['200']") { doesNotExist() }
+                jsonPath("$.paths['/api/v1/assets/{id}'].get.responses['200']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}'].get.responses['404'].content['application/problem+json']") {
+                    exists()
+                }
+            }
+    }
 }

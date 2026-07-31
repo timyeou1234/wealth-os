@@ -72,7 +72,7 @@ class AssetControllerTest {
 
     @Test
     fun `user can create an asset and retrieve it`() {
-        mockMvc.post("/api/v1/assets") {
+        val creationResult = mockMvc.post("/api/v1/assets") {
             contentType = MediaType.APPLICATION_JSON
             content =
                 """
@@ -89,7 +89,17 @@ class AssetControllerTest {
             jsonPath("$.name") { value("Emergency Fund") }
             jsonPath("$.type") { value("CASH") }
             jsonPath("$.liquidity") { value("LIQUID") }
-        }
+        }.andReturn()
+
+        val location = requireNotNull(creationResult.response.getHeader("Location"))
+        mockMvc.get(location)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.id") { isNotEmpty() }
+                jsonPath("$.name") { value("Emergency Fund") }
+                jsonPath("$.type") { value("CASH") }
+                jsonPath("$.liquidity") { value("LIQUID") }
+            }
 
         mockMvc.get("/api/v1/assets")
             .andExpect {
@@ -125,5 +135,21 @@ class AssetControllerTest {
             jsonPath("$.errors[0].field") { value("name") }
             jsonPath("$.errors[0].message") { value("must not be blank") }
         }
+    }
+
+    @Test
+    fun `missing asset returns a not found problem`() {
+        val missingId = "0f27e4fa-99f8-4c5e-87da-527488cbe515"
+
+        mockMvc.get("/api/v1/assets/$missingId")
+            .andExpect {
+                status { isNotFound() }
+                content { contentType("application/problem+json") }
+                jsonPath("$.type") { value("urn:wealthos:problem:asset-not-found") }
+                jsonPath("$.title") { value("Asset not found") }
+                jsonPath("$.status") { value(404) }
+                jsonPath("$.detail") { value("Asset $missingId was not found") }
+                jsonPath("$.instance") { value("/api/v1/assets/$missingId") }
+            }
     }
 }
