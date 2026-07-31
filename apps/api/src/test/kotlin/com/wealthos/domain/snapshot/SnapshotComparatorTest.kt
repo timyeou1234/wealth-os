@@ -73,6 +73,14 @@ class SnapshotComparatorTest {
             comparison.assetChanges.single { it.assetId == changedAssetId }.valueChange,
         )
         assertEquals(
+            earlierTime,
+            comparison.assetChanges.single { it.assetId == changedAssetId }.previousEffectiveAt,
+        )
+        assertEquals(
+            laterTime,
+            comparison.assetChanges.single { it.assetId == changedAssetId }.currentEffectiveAt,
+        )
+        assertEquals(
             money("-50.00"),
             comparison.assetChanges.single { it.assetId == removedAssetId }.valueChange,
         )

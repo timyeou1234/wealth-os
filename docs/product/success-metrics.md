@@ -23,8 +23,8 @@ exists and should not be gamed through additional low-value features.
 - Every material business rule has automated tests.
 - API changes are visible in generated OpenAPI and checked for unintended breakage.
 - Snapshot and net-worth calculations are deterministic for the same inputs.
-- Snapshot comparisons are deterministic and distinguish added, removed, changed, and
-  stale positions.
+- Snapshot comparisons are deterministic, distinguish added, removed, and changed
+  positions, and preserve the effective dates needed to judge data freshness.
 - Recovery procedures are tested before real personal data is relied upon.
 - Security-sensitive decisions have threat models or ADRs.
 - Documentation changes accompany product and architecture changes.

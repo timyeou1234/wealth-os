@@ -69,8 +69,10 @@ The MVP does not include:
 - A composite financial-health score
 
 Basic snapshot comparison is included: totals and item-level values may be compared, and
-positions may be marked added, removed, changed, or stale. Performance and causal
-attribution remain excluded until the required transaction and market data exists.
+positions may be marked added, removed, or changed. Effective dates remain visible, but
+the MVP does not impose one automatic stale-data threshold across all position types.
+Performance and causal attribution remain excluded until the required transaction and
+market data exists.
 
 ## Collaboration and platforms
 
