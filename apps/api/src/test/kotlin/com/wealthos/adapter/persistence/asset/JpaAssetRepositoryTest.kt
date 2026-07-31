@@ -37,4 +37,26 @@ class JpaAssetRepositoryTest
             assertEquals(asset.type, restored.type)
             assertEquals(asset.liquidity, restored.liquidity)
         }
+
+        @Test
+        fun `finds every persisted asset through the domain port`() {
+            val cash =
+                Asset(
+                    id = AssetId.new(),
+                    name = "Cash",
+                    type = AssetType.CASH,
+                    liquidity = Liquidity.LIQUID,
+                )
+            val home =
+                Asset(
+                    id = AssetId.new(),
+                    name = "Home",
+                    type = AssetType.REAL_ESTATE,
+                    liquidity = Liquidity.ILLIQUID,
+                )
+            repository.save(cash)
+            repository.save(home)
+
+            assertEquals(setOf(cash, home), repository.findAll().toSet())
+        }
     }

@@ -15,6 +15,8 @@ class JpaAssetRepository(
 
     override fun findById(id: AssetId): Asset? = repository.findById(id.value).orElse(null)?.toDomain()
 
+    override fun findAll(): List<Asset> = repository.findAll().map { it.toDomain() }
+
     private fun Asset.toEntity(): AssetJpaEntity =
         AssetJpaEntity(
             id = id.value,
