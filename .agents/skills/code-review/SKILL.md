@@ -10,6 +10,10 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
 Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings. Review only: do not modify the code unless the user separately asks for fixes.
 
+Keep review delegation bounded. Sub-agents receive only the pinned diff instructions,
+the sources needed for their axis, and the requested output format. They do not inherit
+the parent conversation.
+
 ## Process
 
 ### 1. Pin the fixed point
@@ -63,9 +67,22 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Spawn both sub-agents in parallel
+### 4. Spawn both bounded sub-agents in parallel
 
 In Codex, call `spawn_agent` twice without waiting between calls, once for each axis. Give each sub-agent only its axis-specific brief and the shared pinned diff context. Do not ask one sub-agent to perform both reviews. After both are running, wait for both results before aggregating. If sub-agents are unavailable, run the two reviews sequentially with isolated notes and disclose the fallback.
+
+Use these spawn settings:
+
+| Axis | Model | Reasoning | Inherited turns |
+| --- | --- | --- | --- |
+| Standards | `gpt-5.6-terra` | `medium` | `none` |
+| Spec | `gpt-5.6-terra` | `low` | `none` |
+
+Set `fork_turns` to `none` and make each prompt self-contained. Do not paste the parent
+conversation, raw test logs, or entire source documents. Pass immutable SHAs, exact diff
+and log commands, relevant file paths, the extracted Issue acceptance criteria, and the
+axis-specific brief. If the preferred model is unavailable, omit the model override but
+keep the bounded-context and reasoning-effort rules.
 
 **Standards sub-agent prompt** — include:
 
@@ -96,6 +113,21 @@ Present actionable findings first under `## Standards` and `## Spec`. For every 
 Do **not** merge or rerank findings across the two axes (see _Why two axes_). If an axis has no findings, say so explicitly. Put a short summary after the findings, not before them.
 
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes — that's the reranking the separation exists to prevent.
+
+### 6. Verify fixes without automatic full re-review
+
+Run one parallel two-axis review for a candidate pull-request state. If the user asks to
+apply findings, the parent agent makes the fixes and verifies each cited behavior with
+targeted tests, diff inspection, and the original standards or specification source.
+
+Do not automatically spawn both review agents again after narrow fixes. Repeat the full
+parallel review only when a fix materially changes product scope, architecture, the API
+contract, the data model, security boundaries, or enough of the diff that the original
+review evidence is no longer representative. Explain why a repeated full review is
+needed before spawning it.
+
+Agent-workflow and documentation-only changes may use the single-pass review allowed by
+`AGENTS.md`; do not recursively spawn this skill to validate changes to this skill.
 
 ## Why two axes
 
