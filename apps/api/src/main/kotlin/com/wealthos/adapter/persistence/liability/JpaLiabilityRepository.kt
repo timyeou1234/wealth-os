@@ -13,6 +13,8 @@ class JpaLiabilityRepository(
 
     override fun findById(id: LiabilityId): Liability? = repository.findById(id.value).orElse(null)?.toDomain()
 
+    override fun findAll(): List<Liability> = repository.findAll().map { it.toDomain() }
+
     private fun Liability.toEntity(): LiabilityJpaEntity =
         LiabilityJpaEntity(
             id = id.value,

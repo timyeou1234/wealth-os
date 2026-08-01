@@ -4,4 +4,6 @@ interface LiabilityRepository {
     fun save(liability: Liability): Liability
 
     fun findById(id: LiabilityId): Liability?
+
+    fun findAll(): List<Liability>
 }
