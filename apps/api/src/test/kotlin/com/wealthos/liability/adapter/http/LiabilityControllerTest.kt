@@ -93,6 +93,25 @@ class LiabilityControllerTest {
     }
 
     @Test
+    fun `missing liability name identifies the invalid request`() {
+        mockMvc.post("/api/v1/liabilities") {
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andExpect {
+            status { isBadRequest() }
+            content { contentType("application/problem+json") }
+            jsonPath("$.type") { value("urn:wealthos:problem:validation-error") }
+            jsonPath("$.title") { value("Request validation failed") }
+            jsonPath("$.status") { value(400) }
+            jsonPath("$.detail") { value("The request body is invalid") }
+            jsonPath("$.instance") { value("/api/v1/liabilities") }
+            jsonPath("$.errors.length()") { value(1) }
+            jsonPath("$.errors[0].field") { value("request") }
+            jsonPath("$.errors[0].message") { value("must be valid JSON with all required fields") }
+        }
+    }
+
+    @Test
     fun `missing liability returns a not found problem`() {
         val missingId = "0f27e4fa-99f8-4c5e-87da-527488cbe515"
 
@@ -105,6 +124,23 @@ class LiabilityControllerTest {
                 jsonPath("$.status") { value(404) }
                 jsonPath("$.detail") { value("Liability $missingId was not found") }
                 jsonPath("$.instance") { value("/api/v1/liabilities/$missingId") }
+            }
+    }
+
+    @Test
+    fun `invalid liability identifier identifies the invalid field`() {
+        mockMvc.get("/api/v1/liabilities/not-a-uuid")
+            .andExpect {
+                status { isBadRequest() }
+                content { contentType("application/problem+json") }
+                jsonPath("$.type") { value("urn:wealthos:problem:validation-error") }
+                jsonPath("$.title") { value("Request validation failed") }
+                jsonPath("$.status") { value(400) }
+                jsonPath("$.detail") { value("One or more fields are invalid") }
+                jsonPath("$.instance") { value("/api/v1/liabilities/not-a-uuid") }
+                jsonPath("$.errors.length()") { value(1) }
+                jsonPath("$.errors[0].field") { value("id") }
+                jsonPath("$.errors[0].message") { value("must be a valid UUID") }
             }
     }
 
