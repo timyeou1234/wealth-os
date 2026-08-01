@@ -5,6 +5,7 @@ import com.wealthos.domain.financialhealth.FinancialHealthResult
 import com.wealthos.domain.financialhealth.FinancialRatio
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.SnapshotId
+import com.wealthos.financialhealth.application.FinancialHealthView
 import com.wealthos.financialhealth.application.GetFinancialHealth
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -28,27 +29,40 @@ class FinancialHealthController(
 }
 
 data class FinancialHealthResponse(
-    val totalAssets: MoneyResponse,
-    val totalLiabilities: MoneyResponse,
-    val netWorth: MoneyResponse,
+    val status: String,
+    val reason: String?,
+    val totalAssets: MoneyResponse?,
+    val totalLiabilities: MoneyResponse?,
+    val netWorth: MoneyResponse?,
     val debtRatio: String?,
     val liquidityRatio: String?,
+    val explanations: FinancialHealthExplanations,
 ) {
     companion object {
-        fun from(result: FinancialHealthResult): FinancialHealthResponse =
-            when (result) {
-                is FinancialHealthResult.Calculated -> from(result.financialHealth)
-                is FinancialHealthResult.InsufficientData ->
-                    throw IllegalStateException("Financial health is incomplete: ${result.reason}")
-            }
+        fun from(view: FinancialHealthView): FinancialHealthResponse = when (val result = view.result) {
+            is FinancialHealthResult.Calculated -> from(view, result.financialHealth)
+            is FinancialHealthResult.InsufficientData -> FinancialHealthResponse(
+                status = "INSUFFICIENT_DATA",
+                reason = result.reason.toString(),
+                totalAssets = null,
+                totalLiabilities = null,
+                netWorth = null,
+                debtRatio = null,
+                liquidityRatio = null,
+                explanations = FinancialHealthExplanations.from(view),
+            )
+        }
 
-        private fun from(health: FinancialHealth): FinancialHealthResponse =
+        private fun from(view: FinancialHealthView, health: FinancialHealth): FinancialHealthResponse =
             FinancialHealthResponse(
+                status = "CALCULATED",
+                reason = null,
                 totalAssets = MoneyResponse.from(health.totalAssets),
                 totalLiabilities = MoneyResponse.from(health.totalLiabilities),
                 netWorth = MoneyResponse.from(health.netWorth),
                 debtRatio = health.debtRatio.asString(),
                 liquidityRatio = health.liquidityRatio.asString(),
+                explanations = FinancialHealthExplanations.from(view),
             )
 
         private fun FinancialRatio.asString(): String? =
@@ -58,6 +72,33 @@ data class FinancialHealthResponse(
             }
     }
 }
+
+data class FinancialHealthExplanations(
+    val debtRatioFormula: String,
+    val liquidityRatioFormula: String,
+    val assetContributors: List<FinancialHealthContributor>,
+    val liabilityContributors: List<FinancialHealthContributor>,
+) {
+    companion object {
+        fun from(view: FinancialHealthView): FinancialHealthExplanations = FinancialHealthExplanations(
+            debtRatioFormula = "Total Liabilities / Total Assets",
+            liquidityRatioFormula = "Liquid Assets / Total Assets",
+            assetContributors = view.snapshot.assetPositions.map {
+                FinancialHealthContributor(it.assetId.value.toString(), it.name, it.valuation.value.amount.toPlainString(), it.liquidity.name)
+            },
+            liabilityContributors = view.snapshot.liabilityPositions.map {
+                FinancialHealthContributor(it.liabilityId.value.toString(), it.name, it.balance.balance.amount.toPlainString(), null)
+            },
+        )
+    }
+}
+
+data class FinancialHealthContributor(
+    val id: String,
+    val name: String,
+    val amount: String,
+    val liquidity: String?,
+)
 
 data class MoneyResponse(
     val amount: String,

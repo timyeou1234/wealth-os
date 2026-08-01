@@ -68,11 +68,30 @@ class FinancialHealthControllerTest {
                 status { isOk() }
                 content { contentType("application/json") }
                 jsonPath("$.totalAssets.amount") { value("1000.00") }
+                jsonPath("$.status") { value("CALCULATED") }
                 jsonPath("$.totalAssets.currency") { value("USD") }
                 jsonPath("$.totalLiabilities.amount") { value("250.00") }
                 jsonPath("$.netWorth.amount") { value("750.00") }
                 jsonPath("$.debtRatio") { value("0.250000") }
                 jsonPath("$.liquidityRatio") { value("1.000000") }
+                jsonPath("$.explanations.debtRatioFormula") { value("Total Liabilities / Total Assets") }
+                jsonPath("$.explanations.liquidityRatioFormula") { value("Liquid Assets / Total Assets") }
+                jsonPath("$.explanations.assetContributors[0].name") { value("Cash") }
+            }
+    }
+
+    @Test
+    fun `returns explicit insufficient data for an empty snapshot`() {
+        val asOf = Instant.parse("2026-08-01T00:00:00Z")
+        val snapshot = Snapshot.capture(SnapshotId.new(), asOf, asOf)
+        snapshotRepository.save(snapshot)
+
+        mockMvc.get("/api/v1/financial-health/${snapshot.id.value}")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("INSUFFICIENT_DATA") }
+                jsonPath("$.reason") { value("EmptySnapshot") }
+                jsonPath("$.totalAssets") { doesNotExist() }
             }
     }
 

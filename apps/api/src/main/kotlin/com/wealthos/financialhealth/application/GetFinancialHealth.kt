@@ -10,11 +10,16 @@ import org.springframework.stereotype.Service
 class GetFinancialHealth(
     private val snapshotRepository: SnapshotRepository,
 ) {
-    fun execute(snapshotId: SnapshotId): FinancialHealthResult {
+    fun execute(snapshotId: SnapshotId): FinancialHealthView {
         val snapshot = snapshotRepository.findEffectiveById(snapshotId) ?: throw SnapshotNotFoundException(snapshotId)
-        return FinancialHealthCalculator.calculate(snapshot)
+        return FinancialHealthView(snapshot, FinancialHealthCalculator.calculate(snapshot))
     }
 }
+
+data class FinancialHealthView(
+    val snapshot: com.wealthos.domain.snapshot.Snapshot,
+    val result: FinancialHealthResult,
+)
 
 class SnapshotNotFoundException(
     val snapshotId: SnapshotId,
