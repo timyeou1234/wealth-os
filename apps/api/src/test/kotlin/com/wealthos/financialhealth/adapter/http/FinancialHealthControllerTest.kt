@@ -90,7 +90,7 @@ class FinancialHealthControllerTest {
             .andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("INSUFFICIENT_DATA") }
-                jsonPath("$.reason") { value("EmptySnapshot") }
+                jsonPath("$.reason") { value("EMPTY_SNAPSHOT") }
                 jsonPath("$.totalAssets") { doesNotExist() }
             }
     }

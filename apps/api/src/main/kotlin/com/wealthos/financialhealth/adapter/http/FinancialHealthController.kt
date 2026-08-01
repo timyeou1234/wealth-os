@@ -3,6 +3,7 @@ package com.wealthos.financialhealth.adapter.http
 import com.wealthos.domain.financialhealth.FinancialHealth
 import com.wealthos.domain.financialhealth.FinancialHealthResult
 import com.wealthos.domain.financialhealth.FinancialRatio
+import com.wealthos.domain.financialhealth.InsufficientDataReason
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.financialhealth.application.FinancialHealthView
@@ -43,7 +44,7 @@ data class FinancialHealthResponse(
             is FinancialHealthResult.Calculated -> from(view, result.financialHealth)
             is FinancialHealthResult.InsufficientData -> FinancialHealthResponse(
                 status = "INSUFFICIENT_DATA",
-                reason = result.reason.toString(),
+                reason = result.reason.asCode(),
                 totalAssets = null,
                 totalLiabilities = null,
                 netWorth = null,
@@ -70,6 +71,11 @@ data class FinancialHealthResponse(
                 is FinancialRatio.Defined -> value.toPlainString()
                 FinancialRatio.Undefined -> null
             }
+
+        private fun InsufficientDataReason.asCode(): String = when (this) {
+            InsufficientDataReason.EmptySnapshot -> "EMPTY_SNAPSHOT"
+            is InsufficientDataReason.MixedCurrencies -> "MIXED_CURRENCIES"
+        }
     }
 }
 
@@ -84,10 +90,10 @@ data class FinancialHealthExplanations(
             debtRatioFormula = "Total Liabilities / Total Assets",
             liquidityRatioFormula = "Liquid Assets / Total Assets",
             assetContributors = view.snapshot.assetPositions.map {
-                FinancialHealthContributor(it.assetId.value.toString(), it.name, it.valuation.value.amount.toPlainString(), it.liquidity.name)
+                FinancialHealthContributor(it.assetId.value.toString(), it.name, MoneyResponse.from(it.valuation.value), it.liquidity.name)
             },
             liabilityContributors = view.snapshot.liabilityPositions.map {
-                FinancialHealthContributor(it.liabilityId.value.toString(), it.name, it.balance.balance.amount.toPlainString(), null)
+                FinancialHealthContributor(it.liabilityId.value.toString(), it.name, MoneyResponse.from(it.balance.balance), null)
             },
         )
     }
@@ -96,7 +102,7 @@ data class FinancialHealthExplanations(
 data class FinancialHealthContributor(
     val id: String,
     val name: String,
-    val amount: String,
+    val amount: MoneyResponse,
     val liquidity: String?,
 )
 
