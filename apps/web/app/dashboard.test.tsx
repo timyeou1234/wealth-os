@@ -1,6 +1,6 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Dashboard from "./page";
 
 const api = vi.hoisted(() => ({
@@ -10,6 +10,12 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("./api/client", () => api);
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+afterEach(cleanup);
 
 describe("Dashboard", () => {
   it("shows the latest snapshot financial health and its position details", async () => {
@@ -35,4 +41,24 @@ describe("Dashboard", () => {
     expect(screen.getByText("Net Worth = Total Assets - Total Liabilities")).toBeTruthy();
     expect(screen.getByText("Included in immediately liquid assets: assets classified as LIQUID. SEMI_LIQUID and ILLIQUID assets are excluded.")).toBeTruthy();
   });
+
+  it("does not let an earlier snapshot response overwrite the selected snapshot", async () => {
+    const deferred = <T,>() => { let resolve!: (value: T) => void; return { promise: new Promise<T>((done) => { resolve = done; }), resolve }; };
+    const latestHealth = deferred<{ data: any }>(); const latestSnapshot = deferred<{ data: any }>();
+    const olderHealth = deferred<{ data: any }>(); const olderSnapshot = deferred<{ data: any }>();
+    api.listSnapshots.mockResolvedValue({ data: [{ id: "older", asOf: "2026-07-01T00:00:00Z" }, { id: "latest", asOf: "2026-08-01T00:00:00Z" }] });
+    api.getFinancialHealth.mockImplementation(({ path }: { path: { snapshotId: string } }) => path.snapshotId === "latest" ? latestHealth.promise : olderHealth.promise);
+    api.getSnapshot.mockImplementation(({ path }: { path: { id: string } }) => path.id === "latest" ? latestSnapshot.promise : olderSnapshot.promise);
+    render(<Dashboard />);
+    const selector = await screen.findByRole("combobox", { name: "Snapshot" });
+    await waitFor(() => expect(api.getFinancialHealth).toHaveBeenCalledWith({ path: { snapshotId: "latest" } }));
+    fireEvent.change(selector, { target: { value: "older" } });
+    await waitFor(() => expect(api.getFinancialHealth).toHaveBeenCalledWith({ path: { snapshotId: "older" } }));
+    olderHealth.resolve({ data: { status: "CALCULATED", netWorth: { amount: "150.00", currency: "USD" } } }); olderSnapshot.resolve({ data: { assets: [], liabilities: [] } });
+    expect(await screen.findByText("$150.00")).toBeTruthy();
+    latestHealth.resolve({ data: { status: "CALCULATED", netWorth: { amount: "900.00", currency: "USD" } } }); latestSnapshot.resolve({ data: { assets: [], liabilities: [] } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByText("$900.00")).toBeNull();
+  });
+
 });
