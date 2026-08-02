@@ -13,7 +13,14 @@ type FinancialHealth = {
   netWorth: Money | null;
   debtRatio: string | null;
   liquidityRatio: string | null;
+  explanations?: {
+    debtRatioFormula: string;
+    liquidityRatioFormula: string;
+    assetContributors: Contributor[];
+    liabilityContributors: Contributor[];
+  };
 };
+type Contributor = { id: string; name: string; amount: Money; liquidity: string | null };
 
 const money = (value: Money | null | undefined) =>
   value ? new Intl.NumberFormat("en-US", { style: "currency", currency: value.currency }).format(Number(value.amount)) : "—";
@@ -58,6 +65,15 @@ export default function Dashboard() {
         <Card label="Debt ratio" value={percent(health?.debtRatio)} />
         <Card label="Liquidity ratio" value={percent(health?.liquidityRatio)} />
       </section>}
+      {health?.status === "CALCULATED" && health.explanations && <details className="explanations">
+        <summary>How these metrics are calculated</summary>
+        <p>Debt ratio: {health.explanations.debtRatioFormula}</p>
+        <p>Liquidity ratio: {health.explanations.liquidityRatioFormula}</p>
+        <h2>Asset contributors</h2>
+        <ul>{health.explanations.assetContributors.map((item) => <li key={item.id}>{item.name} — {money(item.amount)} ({item.liquidity})</li>)}</ul>
+        <h2>Liability contributors</h2>
+        <ul>{health.explanations.liabilityContributors.map((item) => <li key={item.id}>{item.name} — {money(item.amount)}</li>)}</ul>
+      </details>}
     </main>
   );
 }
