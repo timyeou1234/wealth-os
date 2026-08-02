@@ -5,6 +5,7 @@ class Asset(
     name: String,
     val type: AssetType,
     val liquidity: Liquidity,
+    val archived: Boolean = false,
 ) {
     val name: String = name.trim()
 

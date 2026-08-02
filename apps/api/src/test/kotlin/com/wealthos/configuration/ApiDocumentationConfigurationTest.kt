@@ -56,4 +56,22 @@ class ApiDocumentationConfigurationTest {
                 }
             }
     }
+
+    @Test
+    fun `documents asset and liability lifecycle operations`() {
+        mockMvc.get("/v3/api-docs")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.responses['200']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.responses['400']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.responses['404']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}/archive'].post.responses['204']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}/archive'].post.responses['404']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.responses['200']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.responses['400']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.responses['404']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}/archive'].post.responses['204']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}/archive'].post.responses['404']") { exists() }
+            }
+    }
 }

@@ -23,6 +23,7 @@ class JpaAssetRepository(
             name = name,
             assetType = type.name,
             liquidity = liquidity.name,
+            archived = archived,
         )
 
     private fun AssetJpaEntity.toDomain(): Asset =
@@ -31,5 +32,6 @@ class JpaAssetRepository(
             name = name,
             type = AssetType.valueOf(assetType),
             liquidity = Liquidity.valueOf(liquidity),
+            archived = archived,
         )
 }

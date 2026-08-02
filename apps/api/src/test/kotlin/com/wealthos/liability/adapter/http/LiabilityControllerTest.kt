@@ -9,6 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.springframework.transaction.annotation.Transactional
 
 @SpringBootTest(
@@ -65,6 +66,56 @@ class LiabilityControllerTest {
                 status { isOk() }
                 jsonPath("$.id") { isNotEmpty() }
                 jsonPath("$.name") { value("Home Mortgage") }
+            }
+    }
+
+    @Test
+    fun `user can update a liability name`() {
+        val creationResult =
+            mockMvc.post("/api/v1/liabilities") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"Car Finance"}"""
+            }.andReturn()
+        val location = requireNotNull(creationResult.response.getHeader("Location"))
+
+        mockMvc.put(location) {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"Vehicle Loan"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.name") { value("Vehicle Loan") }
+        }
+
+        mockMvc.get(location)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name") { value("Vehicle Loan") }
+            }
+    }
+
+    @Test
+    fun `user can archive a liability without removing its resource`() {
+        val creationResult =
+            mockMvc.post("/api/v1/liabilities") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"Settled Loan"}"""
+            }.andReturn()
+        val location = requireNotNull(creationResult.response.getHeader("Location"))
+
+        mockMvc.post("$location/archive")
+            .andExpect { status { isNoContent() } }
+
+        mockMvc.get("/api/v1/liabilities")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(0) }
+            }
+
+        mockMvc.get(location)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name") { value("Settled Loan") }
+                jsonPath("$.archived") { value(true) }
             }
     }
 

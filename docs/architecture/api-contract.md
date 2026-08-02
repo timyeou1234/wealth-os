@@ -86,6 +86,17 @@ Pagination is deferred until the first collection endpoint needs it. Its query
 parameters and response metadata must be added here before that endpoint is published;
 individual controllers must not invent incompatible pagination formats.
 
+## Resource lifecycle
+
+- Asset and Liability metadata is replaced with `PUT /api/v1/<resources>/{id}`.
+- Archiving uses `POST /api/v1/<resources>/{id}/archive`; it does not delete historical
+  Snapshot facts.
+- Archive operations return `204 No Content`.
+- Default Asset and Liability collections contain active resources only.
+- Direct resource lookup continues to return an archived resource with
+  `archived: true`, allowing callers to distinguish it from a missing identifier.
+- Updating or archiving current metadata never rewrites an existing Snapshot.
+
 ## Security boundary
 
 The first API is for local development and a single-user product. Authentication and the

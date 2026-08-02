@@ -13,4 +13,6 @@ class LiabilityJpaEntity(
     val id: UUID,
     @Column(nullable = false)
     val name: String,
+    @Column(nullable = false)
+    val archived: Boolean,
 )
