@@ -15,9 +15,11 @@ import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.snapshot.application.SnapshotApplication
 import com.wealthos.snapshot.application.SnapshotNotFoundException
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -47,7 +49,12 @@ class SnapshotController(private val snapshots: SnapshotApplication) {
     fun get(@PathVariable id: UUID): SnapshotResponse = SnapshotResponse.from(snapshots.get(SnapshotId(id)))
 }
 
-data class CreateSnapshotRequest(val asOf: Instant, val recordedAt: Instant, @field:Valid val assets: List<AssetFactRequest>, @field:Valid val liabilities: List<LiabilityFactRequest>) {
+data class CreateSnapshotRequest(
+    @field:NotNull @field:Schema(example = "2026-08-01T00:00:00Z") val asOf: Instant,
+    @field:NotNull @field:Schema(example = "2026-08-01T00:00:00Z") val recordedAt: Instant,
+    @field:Valid val assets: List<AssetFactRequest> = emptyList(),
+    @field:Valid val liabilities: List<LiabilityFactRequest> = emptyList(),
+) {
     fun toDomain(): Snapshot {
         val assetIds = assets.map { AssetId(UUID.fromString(it.id)) }
         val liabilityIds = liabilities.map { LiabilityId(UUID.fromString(it.id)) }
@@ -61,9 +68,26 @@ data class CreateSnapshotRequest(val asOf: Instant, val recordedAt: Instant, @fi
     }
 }
 
-data class MoneyRequest(@field:NotBlank val amount: String, @field:NotBlank val currency: String)
-data class AssetFactRequest(@field:Pattern(regexp = "^[0-9a-fA-F-]{36}$") val id: String, @field:NotBlank val name: String, val type: AssetType, val liquidity: Liquidity, @field:Valid val money: MoneyRequest, val effectiveAt: Instant, @field:NotBlank val source: String)
-data class LiabilityFactRequest(@field:Pattern(regexp = "^[0-9a-fA-F-]{36}$") val id: String, @field:NotBlank val name: String, @field:Valid val money: MoneyRequest, val effectiveAt: Instant, @field:NotBlank val source: String)
+data class MoneyRequest(
+    @field:NotBlank @field:Schema(example = "1000.00") val amount: String,
+    @field:NotBlank @field:Schema(example = "USD") val currency: String,
+)
+data class AssetFactRequest(
+    @field:Pattern(regexp = "^[0-9a-fA-F-]{36}$") @field:Schema(example = "0f27e4fa-99f8-4c5e-87da-527488cbe515") val id: String,
+    @field:NotBlank @field:Schema(example = "Cash") val name: String,
+    @field:NotNull val type: AssetType,
+    @field:NotNull val liquidity: Liquidity,
+    @field:Valid @field:NotNull val money: MoneyRequest,
+    @field:NotNull @field:Schema(example = "2026-08-01T00:00:00Z") val effectiveAt: Instant,
+    @field:NotBlank @field:Schema(example = "bank") val source: String,
+)
+data class LiabilityFactRequest(
+    @field:Pattern(regexp = "^[0-9a-fA-F-]{36}$") @field:Schema(example = "0f27e4fa-99f8-4c5e-87da-527488cbe515") val id: String,
+    @field:NotBlank @field:Schema(example = "Home Mortgage") val name: String,
+    @field:Valid @field:NotNull val money: MoneyRequest,
+    @field:NotNull @field:Schema(example = "2026-08-01T00:00:00Z") val effectiveAt: Instant,
+    @field:NotBlank @field:Schema(example = "bank") val source: String,
+)
 data class SnapshotResponse(val id: String, val asOf: Instant, val recordedAt: Instant, val assets: List<AssetFactResponse>, val liabilities: List<LiabilityFactResponse>) {
     companion object {
         fun from(s: Snapshot) = SnapshotResponse(s.id.value.toString(), s.asOf, s.recordedAt, s.assetPositions.map { AssetFactResponse(it.assetId.value.toString(), it.name, it.type, it.liquidity, MoneyResponse(it.valuation.value.amount.toPlainString(), it.valuation.value.currency.code), it.valuation.effectiveAt, it.valuation.source.value) }, s.liabilityPositions.map { LiabilityFactResponse(it.liabilityId.value.toString(), it.name, MoneyResponse(it.balance.balance.amount.toPlainString(), it.balance.balance.currency.code), it.balance.effectiveAt, it.balance.source.value) })
