@@ -27,15 +27,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!selectedId) return;
-    getFinancialHealth({ path: { snapshotId: selectedId } })
-      .then(({ data }) => data && setHealth(data));
-  }, [selectedId]);
-
-  useEffect(() => {
-    if (!selectedId) return;
+    let cancelled = false;
+    setHealth(undefined);
     setSnapshot(undefined);
-    getSnapshot({ path: { id: selectedId } })
-      .then(({ data }) => data && setSnapshot(data));
+
+    Promise.all([
+      getFinancialHealth({ path: { snapshotId: selectedId } }),
+      getSnapshot({ path: { id: selectedId } }),
+    ]).then(([healthResponse, snapshotResponse]) => {
+      if (cancelled) return;
+      if (healthResponse.data) setHealth(healthResponse.data);
+      if (snapshotResponse.data) setSnapshot(snapshotResponse.data);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId]);
 
   if (snapshots.length === 0) {
