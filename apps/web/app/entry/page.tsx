@@ -1,0 +1,341 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import React, { FormEvent, useEffect, useRef, useState } from "react";
+import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
+import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse } from "../api/client";
+import { parseAgentImport } from "./import";
+import type { AgentImport } from "./import";
+
+type AssetType = CaptureAssetRequest["type"];
+type Liquidity = CaptureAssetRequest["liquidity"];
+
+type AssetDraft = {
+  key: string;
+  id?: string;
+  name: string;
+  type: AssetType | "";
+  liquidity: Liquidity | "";
+  amount: string;
+  effectiveDate: string;
+  source: string;
+  carriedFrom?: string;
+};
+
+type LiabilityDraft = {
+  key: string;
+  id?: string;
+  name: string;
+  amount: string;
+  effectiveDate: string;
+  source: string;
+  carriedFrom?: string;
+};
+
+type ArchiveTarget = { kind: "asset" | "liability"; id: string; key: string; name: string };
+
+const instant = (day: string) => new Date(`${day}T00:00:00Z`).toISOString();
+const day = (value?: string) => value?.slice(0, 10) ?? "";
+const today = () => new Date().toISOString().slice(0, 10);
+const displayDate = (value: string) => new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(value));
+const assetTypes = ["CASH", "INVESTMENT", "REAL_ESTATE", "VEHICLE", "BUSINESS", "OTHER"] as const;
+const liquidities = ["LIQUID", "SEMI_LIQUID", "ILLIQUID"] as const;
+const decimal = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+const currencyCode = /^[A-Z]{3}$/;
+
+export default function EntryPage() {
+  const router = useRouter();
+  const nextKey = useRef(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
+  const [error, setError] = useState<string>();
+  const [snapshotDate, setSnapshotDate] = useState(today);
+  const [baseCurrency, setBaseCurrency] = useState("");
+  const [assets, setAssets] = useState<AssetDraft[]>([]);
+  const [liabilities, setLiabilities] = useState<LiabilityDraft[]>([]);
+  const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget>();
+  const [includeDraftInPrompt, setIncludeDraftInPrompt] = useState(false);
+  const [agentJson, setAgentJson] = useState("");
+  const [importError, setImportError] = useState<string>();
+  const [importReview, setImportReview] = useState<{ data: AgentImport; changes: string[] }>();
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([listAssets(), listLiabilities(), listSnapshots()])
+      .then(async ([assetResponse, liabilityResponse, snapshotResponse]) => {
+        const currentAssets = assetResponse.data ?? [];
+        const currentLiabilities = liabilityResponse.data ?? [];
+        const latest = snapshotResponse.data?.at(-1);
+        const saved = latest?.id ? (await getSnapshot({ path: { id: latest.id } })).data : undefined;
+        if (cancelled) return;
+        hydrate(currentAssets, currentLiabilities, saved, setAssets, setLiabilities, setBaseCurrency);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("Unable to load the current balance sheet. Try again.");
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const addAsset = () => {
+    const key = `new-asset-${nextKey.current++}`;
+    setAssets((items) => [...items, { key, name: "", type: "", liquidity: "", amount: "", effectiveDate: snapshotDate, source: "" }]);
+  };
+
+  const addLiability = () => {
+    const key = `new-liability-${nextKey.current++}`;
+    setLiabilities((items) => [...items, { key, name: "", amount: "", effectiveDate: snapshotDate, source: "" }]);
+  };
+
+  const confirmArchive = async () => {
+    if (!archiveTarget) return;
+    try {
+      if (archiveTarget.kind === "asset") {
+        await archiveAsset({ path: { id: archiveTarget.id } });
+        setAssets((items) => items.filter((item) => item.key !== archiveTarget.key));
+      } else {
+        await archiveLiability({ path: { id: archiveTarget.id } });
+        setLiabilities((items) => items.filter((item) => item.key !== archiveTarget.key));
+      }
+      setArchiveTarget(undefined);
+    } catch {
+      setError(`${archiveTarget.name} could not be archived. Try again.`);
+    }
+  };
+
+  const previewImport = () => {
+    setImportError(undefined);
+    try {
+      const data = parseAgentImport(
+        agentJson,
+        new Set(assets.flatMap((item) => item.id ? [item.id] : [])),
+        new Set(liabilities.flatMap((item) => item.id ? [item.id] : [])),
+      );
+      const changes = [
+        ...data.assets.map((item) => item.id ? `Update asset: ${assets.find((asset) => asset.id === item.id)?.name} → ${item.name}` : `Add asset: ${item.name}`),
+        ...data.liabilities.map((item) => item.id ? `Update liability: ${liabilities.find((liability) => liability.id === item.id)?.name} → ${item.name}` : `Add liability: ${item.name}`),
+      ];
+      setImportReview({ data, changes });
+    } catch (exception) {
+      setImportReview(undefined);
+      setImportError(exception instanceof Error ? exception.message : "Agent output could not be validated.");
+    }
+  };
+
+  const applyImport = () => {
+    if (!importReview) return;
+    const data = importReview.data;
+    if (data.baseCurrency) setBaseCurrency(data.baseCurrency);
+    if (data.snapshotDate) setSnapshotDate(data.snapshotDate);
+    setAssets((current) => mergeAssets(current, data, nextKey));
+    setLiabilities((current) => mergeLiabilities(current, data, nextKey));
+    setImportReview(undefined);
+    setAgentJson("");
+  };
+
+  const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(undefined);
+    if (!snapshotDate || !currencyCode.test(baseCurrency) || !valid(assets, liabilities, snapshotDate)) {
+      setShowValidation(true);
+      setError("Complete every required field before saving the Snapshot.");
+      event.currentTarget.querySelector<HTMLElement>(":invalid")?.focus();
+      return;
+    }
+    const body: CaptureSnapshotRequest = {
+      asOf: instant(snapshotDate),
+      recordedAt: new Date().toISOString(),
+      baseCurrency,
+      assets: assets.map((asset) => ({
+        ...(asset.id ? { id: asset.id } : {}),
+        name: asset.name,
+        type: asset.type as AssetType,
+        liquidity: asset.liquidity as Liquidity,
+        money: { amount: asset.amount, currency: baseCurrency },
+        effectiveAt: instant(asset.effectiveDate),
+        source: asset.source,
+      })),
+      liabilities: liabilities.map((liability) => ({
+        ...(liability.id ? { id: liability.id } : {}),
+        name: liability.name,
+        money: { amount: liability.amount, currency: baseCurrency },
+        effectiveAt: instant(liability.effectiveDate),
+        source: liability.source,
+      })),
+    };
+    setSaving(true);
+    try {
+      const response = await captureSnapshot({ body });
+      if (!response.data?.id) throw new Error("Snapshot response did not include an ID");
+      router.push(`/?snapshot=${response.data.id}`);
+    } catch {
+      setError("The Snapshot could not be saved. Your entries are still here; try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <main className="entry-page">
+      <header className="entry-header">
+        <div><p className="eyebrow">Balance-sheet entry</p><h1>Update balance sheet</h1></div>
+        <Link href="/">Back to Dashboard</Link>
+      </header>
+      {loading ? <p>Loading current positions…</p> : <form onSubmit={submit} noValidate>
+        <section className="entry-settings" aria-label="Snapshot settings">
+          <label>Snapshot date<input aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
+          <label>Base currency<input aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
+        </section>
+
+        <section className="ai-import" aria-labelledby="ai-import-title">
+          <div><p className="eyebrow">Optional accelerator</p><h2 id="ai-import-title">AI-assisted import</h2></div>
+          <p>Copy the Prompt to your own AI agent, then paste its JSON response here. Nothing is sent automatically.</p>
+          <label className="checkbox-label"><input type="checkbox" checked={includeDraftInPrompt} onChange={(event) => setIncludeDraftInPrompt(event.target.checked)} />Include current draft in Prompt</label>
+          {includeDraftInPrompt && <p className="sensitive-warning">This Prompt contains sensitive financial data.</p>}
+          <label>AI Prompt<textarea aria-label="AI Prompt" value={prompt} readOnly rows={12} /></label>
+          <button type="button" onClick={() => navigator.clipboard?.writeText(prompt)}>Copy Prompt</button>
+          <label>Agent JSON<textarea aria-label="Agent JSON" value={agentJson} onChange={(event) => setAgentJson(event.target.value)} rows={12} placeholder="Paste raw JSON or one JSON code block" /></label>
+          {importError && <p className="form-error" role="alert">{importError}</p>}
+          <button type="button" onClick={previewImport}>Preview import</button>
+        </section>
+
+        <EntrySection title="Assets" onAdd={addAsset} addLabel="Add asset">
+          {assets.map((asset, index) => <AssetFields key={asset.key} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
+        </EntrySection>
+
+        <EntrySection title="Liabilities" onAdd={addLiability} addLabel="Add liability">
+          {liabilities.map((liability, index) => <LiabilityFields key={liability.key} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
+        </EntrySection>
+
+        {archiveTarget && <section className="confirm-dialog" role="dialog" aria-modal="true" aria-label={`Archive ${archiveTarget.name}?`}>
+          <h2>Archive {archiveTarget.name}?</h2>
+          <p>It will leave the current entry list. Saved Snapshots will not change.</p>
+          <div><button type="button" onClick={() => setArchiveTarget(undefined)}>Cancel</button><button type="button" className="danger-action" autoFocus onClick={confirmArchive}>Confirm archive</button></div>
+        </section>}
+        {importReview && <section className="confirm-dialog" role="dialog" aria-modal="true" aria-label="Review AI import">
+          <h2>Review AI import</h2>
+          {importReview.changes.length === 0 ? <p>No additions or changes were supplied.</p> : <ul>{importReview.changes.map((change) => <li key={change}>{change}</li>)}</ul>}
+          <p>This changes only the current form. It does not call the API or archive omitted positions.</p>
+          <div><button type="button" onClick={() => setImportReview(undefined)}>Cancel</button><button type="button" autoFocus onClick={applyImport}>Apply import</button></div>
+        </section>}
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <button className="primary-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Snapshot"}</button>
+      </form>}
+    </main>
+  );
+}
+
+function EntrySection({ title, onAdd, addLabel, children }: { title: string; onAdd: () => void; addLabel: string; children: React.ReactNode }) {
+  return <section className="entry-section"><div className="section-heading"><h2>{title}</h2><button type="button" onClick={onAdd}>{addLabel}</button></div><div className="entry-list">{children}</div></section>;
+}
+
+function AssetFields({ draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { draft: AssetDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: AssetDraft) => void; onArchive?: () => void }) {
+  const label = isNew ? "New asset" : draft.name;
+  const invalidName = showValidation && !draft.name.trim();
+  const invalidType = showValidation && !draft.type;
+  const invalidLiquidity = showValidation && !draft.liquidity;
+  const invalidAmount = showValidation && !decimal.test(draft.amount);
+  const invalidDate = showValidation && (!draft.effectiveDate || draft.effectiveDate > snapshotDate);
+  const invalidSource = showValidation && !draft.source.trim();
+  return <fieldset className="position-editor" aria-label={label}><legend>{label}</legend>
+    <label>Name<input aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
+    <label>Type<select aria-label={isNew ? "Type" : `${label} type`} aria-invalid={invalidType || undefined} value={draft.type} onChange={(event) => onChange({ ...draft, type: event.target.value as AssetType | "" })} required><option value="">Choose type</option>{assetTypes.map((value) => <option key={value}>{value}</option>)}</select>{invalidType && <span className="field-error">Type is required.</span>}</label>
+    <label>Liquidity<select aria-label={isNew ? "Liquidity" : `${label} liquidity`} aria-invalid={invalidLiquidity || undefined} value={draft.liquidity} onChange={(event) => onChange({ ...draft, liquidity: event.target.value as Liquidity | "" })} required><option value="">Choose liquidity</option>{liquidities.map((value) => <option key={value}>{value}</option>)}</select>{invalidLiquidity && <span className="field-error">Liquidity is required.</span>}</label>
+    <label>Amount<input aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Effective date<input aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
+    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={1000} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
+    {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
+    {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
+  </fieldset>;
+}
+
+function LiabilityFields({ draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { draft: LiabilityDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: LiabilityDraft) => void; onArchive?: () => void }) {
+  const label = isNew ? "New liability" : draft.name;
+  const invalidName = showValidation && !draft.name.trim();
+  const invalidAmount = showValidation && !decimal.test(draft.amount);
+  const invalidDate = showValidation && (!draft.effectiveDate || draft.effectiveDate > snapshotDate);
+  const invalidSource = showValidation && !draft.source.trim();
+  return <fieldset className="position-editor" aria-label={label}><legend>{label}</legend>
+    <label>Name<input aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
+    <label>Amount<input aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Effective date<input aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
+    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={1000} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
+    {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
+    {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
+  </fieldset>;
+}
+
+function hydrate(
+  currentAssets: AssetResponse[],
+  currentLiabilities: LiabilityResponse[],
+  snapshot: SnapshotResponse | undefined,
+  setAssets: (items: AssetDraft[]) => void,
+  setLiabilities: (items: LiabilityDraft[]) => void,
+  setBaseCurrency: (currency: string) => void,
+) {
+  const assetFacts = new Map((snapshot?.assets ?? []).map((fact) => [fact.id, fact]));
+  const liabilityFacts = new Map((snapshot?.liabilities ?? []).map((fact) => [fact.id, fact]));
+  const currency = snapshot?.assets?.[0]?.money?.currency ?? snapshot?.liabilities?.[0]?.money?.currency ?? "";
+  setBaseCurrency(currency);
+  setAssets(currentAssets.map((asset, index) => assetDraft(asset, assetFacts.get(asset.id), snapshot?.asOf, index)));
+  setLiabilities(currentLiabilities.map((liability, index) => liabilityDraft(liability, liabilityFacts.get(liability.id), snapshot?.asOf, index)));
+}
+
+function assetDraft(asset: AssetResponse, fact: AssetFactResponse | undefined, carriedFrom: string | undefined, index: number): AssetDraft {
+  return { key: asset.id ?? `asset-${index}`, id: asset.id, name: asset.name ?? "", type: assetTypes.find((value) => value === asset.type) ?? "", liquidity: liquidities.find((value) => value === asset.liquidity) ?? "", amount: fact?.money?.amount ?? "", effectiveDate: day(fact?.effectiveAt) || today(), source: fact?.source ?? "", carriedFrom: fact ? carriedFrom : undefined };
+}
+
+function liabilityDraft(liability: LiabilityResponse, fact: LiabilityFactResponse | undefined, carriedFrom: string | undefined, index: number): LiabilityDraft {
+  return { key: liability.id ?? `liability-${index}`, id: liability.id, name: liability.name ?? "", amount: fact?.money?.amount ?? "", effectiveDate: day(fact?.effectiveAt) || today(), source: fact?.source ?? "", carriedFrom: fact ? carriedFrom : undefined };
+}
+
+function valid(assets: AssetDraft[], liabilities: LiabilityDraft[], snapshotDate: string) {
+  return assets.every((item) => item.name.trim() && item.type && item.liquidity && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim()) &&
+    liabilities.every((item) => item.name.trim() && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim());
+}
+
+function mergeAssets(current: AssetDraft[], imported: AgentImport, nextKey: { current: number }): AssetDraft[] {
+  const updates = new Map(imported.assets.flatMap((item) => item.id ? [[item.id, item] as const] : []));
+  const updated = current.map((draft) => {
+    const item = draft.id ? updates.get(draft.id) : undefined;
+    return item ? { ...draft, name: item.name, type: item.type, liquidity: item.liquidity, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source, carriedFrom: undefined } : draft;
+  });
+  const additions = imported.assets.filter((item) => !item.id).map((item) => ({ key: `imported-asset-${nextKey.current++}`, name: item.name, type: item.type, liquidity: item.liquidity, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source }));
+  return [...updated, ...additions];
+}
+
+function mergeLiabilities(current: LiabilityDraft[], imported: AgentImport, nextKey: { current: number }): LiabilityDraft[] {
+  const updates = new Map(imported.liabilities.flatMap((item) => item.id ? [[item.id, item] as const] : []));
+  const updated = current.map((draft) => {
+    const item = draft.id ? updates.get(draft.id) : undefined;
+    return item ? { ...draft, name: item.name, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source, carriedFrom: undefined } : draft;
+  });
+  const additions = imported.liabilities.filter((item) => !item.id).map((item) => ({ key: `imported-liability-${nextKey.current++}`, name: item.name, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source }));
+  return [...updated, ...additions];
+}
+
+function buildPrompt(includeDraft: boolean, snapshotDate: string, baseCurrency: string, assets: AssetDraft[], liabilities: LiabilityDraft[]): string {
+  const shape = {
+    schemaVersion: 1,
+    baseCurrency: baseCurrency || "TWD",
+    snapshotDate,
+    assets: [{ name: "Example asset", type: "CASH", liquidity: "LIQUID", amount: "1000.00", effectiveDate: snapshotDate, source: "Statement description" }],
+    liabilities: [{ name: "Example liability", amount: "250.00", effectiveDate: snapshotDate, source: "Statement description" }],
+  };
+  const instructions = [
+    "Return only valid JSON matching this schema. Do not add Markdown or explanations.",
+    "schemaVersion must be 1. Preserve every provided id exactly; omit id for new positions and never invent one.",
+    "Amounts must be non-negative decimal strings. Dates must be YYYY-MM-DD. Do not add unknown fields or archive instructions.",
+    `FORMAT EXAMPLE:\n${JSON.stringify(shape, null, 2)}`,
+  ];
+  if (includeDraft) {
+    instructions.push(`CURRENT_DRAFT:\n${JSON.stringify({ schemaVersion: 1, baseCurrency, snapshotDate, assets: assets.map(({ id, name, type, liquidity, amount, effectiveDate, source }) => ({ ...(id ? { id } : {}), name, type, liquidity, amount, effectiveDate, source })), liabilities: liabilities.map(({ id, name, amount, effectiveDate, source }) => ({ ...(id ? { id } : {}), name, amount, effectiveDate, source })) }, null, 2)}`);
+  }
+  return instructions.join("\n\n");
+}

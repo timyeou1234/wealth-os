@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ArchiveAssetData, ArchiveAssetErrors, ArchiveAssetResponses, ArchiveLiabilityData, ArchiveLiabilityErrors, ArchiveLiabilityResponses, CreateAssetData, CreateAssetErrors, CreateAssetResponses, CreateLiabilityData, CreateLiabilityErrors, CreateLiabilityResponses, CreateSnapshotData, CreateSnapshotResponses, GetAssetData, GetAssetErrors, GetAssetResponses, GetFinancialHealthData, GetFinancialHealthResponses, GetLiabilityData, GetLiabilityErrors, GetLiabilityResponses, GetSnapshotData, GetSnapshotResponses, ListAssetsData, ListAssetsResponses, ListLiabilitiesData, ListLiabilitiesResponses, ListSnapshotsData, ListSnapshotsResponses, UpdateAssetData, UpdateAssetErrors, UpdateAssetResponses, UpdateLiabilityData, UpdateLiabilityErrors, UpdateLiabilityResponses } from './types.gen';
+import type { ArchiveAssetData, ArchiveAssetErrors, ArchiveAssetResponses, ArchiveLiabilityData, ArchiveLiabilityErrors, ArchiveLiabilityResponses, CaptureSnapshotData, CaptureSnapshotErrors, CaptureSnapshotResponses, CreateAssetData, CreateAssetErrors, CreateAssetResponses, CreateLiabilityData, CreateLiabilityErrors, CreateLiabilityResponses, CreateSnapshotData, CreateSnapshotResponses, GetAssetData, GetAssetErrors, GetAssetResponses, GetFinancialHealthData, GetFinancialHealthResponses, GetLiabilityData, GetLiabilityErrors, GetLiabilityResponses, GetSnapshotData, GetSnapshotResponses, ListAssetsData, ListAssetsResponses, ListLiabilitiesData, ListLiabilitiesResponses, ListSnapshotsData, ListSnapshotsResponses, UpdateAssetData, UpdateAssetErrors, UpdateAssetResponses, UpdateLiabilityData, UpdateLiabilityErrors, UpdateLiabilityResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -62,6 +62,18 @@ export const listSnapshots = <ThrowOnError extends boolean = false>(options?: Op
  */
 export const createSnapshot = <ThrowOnError extends boolean = false>(options: Options<CreateSnapshotData, ThrowOnError>): RequestResult<CreateSnapshotResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateSnapshotResponses, unknown, ThrowOnError>({
     url: '/api/v1/snapshots',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Atomically update the current balance sheet and capture a snapshot
+ */
+export const captureSnapshot = <ThrowOnError extends boolean = false>(options: Options<CaptureSnapshotData, ThrowOnError>): RequestResult<CaptureSnapshotResponses, CaptureSnapshotErrors, ThrowOnError> => (options.client ?? client).post<CaptureSnapshotResponses, CaptureSnapshotErrors, ThrowOnError>({
+    url: '/api/v1/snapshot-captures',
     ...options,
     headers: {
         'Content-Type': 'application/json',

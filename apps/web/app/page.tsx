@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { getFinancialHealth, getSnapshot, listSnapshots } from "./api/client";
 import type { AssetFactResponse, FinancialHealthResponse, LiabilityFactResponse, MoneyResponse, SnapshotResponse } from "./api/client";
 
@@ -21,7 +22,8 @@ export default function Dashboard() {
       .then(({ data: items }) => {
         if (!items) return;
         setSnapshots(items);
-        setSelectedId(items.at(-1)?.id);
+        const requestedId = new URLSearchParams(window.location.search).get("snapshot");
+        setSelectedId(items.some((item) => item.id === requestedId) ? requestedId ?? undefined : items.at(-1)?.id);
       });
   }, []);
 
@@ -46,14 +48,14 @@ export default function Dashboard() {
   }, [selectedId]);
 
   if (snapshots.length === 0) {
-    return <main className="dashboard"><h1>Wealth OS</h1><p>Save a Snapshot to see your financial position.</p></main>;
+    return <main className="dashboard"><h1>Wealth OS</h1><p>Save a Snapshot to see your financial position.</p><Link className="primary-link" href="/entry">Enter balance sheet</Link></main>;
   }
 
   return (
     <main className="dashboard">
       <header>
         <div><p className="eyebrow">Financial position</p><h1>Wealth OS</h1></div>
-        <label>Snapshot<select aria-label="Snapshot" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>{snapshots.map((snapshot) => <option key={snapshot.id} value={snapshot.id}>{date(snapshot.asOf)}</option>)}</select></label>
+        <div className="dashboard-actions"><Link href="/entry">Update balance sheet</Link><label>Snapshot<select aria-label="Snapshot" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>{snapshots.map((snapshot) => <option key={snapshot.id} value={snapshot.id}>{date(snapshot.asOf)}</option>)}</select></label></div>
       </header>
       {health?.status === "INSUFFICIENT_DATA" ? <p>Financial health is incomplete: {health.reason}.</p> : <section className="cards">
         <Card label="Total assets" value={money(health?.totalAssets)} />

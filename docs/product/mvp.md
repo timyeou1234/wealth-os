@@ -42,6 +42,9 @@ The first release should allow a financially engaged individual to answer:
 - When an original value uses another currency, manually convert it using an explicit
   exchange-rate assumption recorded in provenance.
 - Preserve enough source data to reproduce a historical snapshot.
+- Offer an optional paste-only AI-assisted entry workflow: Wealth OS provides a strict
+  prompt and validates the agent's JSON locally, but never sends financial data to an AI
+  service or applies imported changes without user review.
 
 ### Financial position
 

@@ -97,6 +97,36 @@ individual controllers must not invent incompatible pagination formats.
   `archived: true`, allowing callers to distinguish it from a missing identifier.
 - Updating or archiving current metadata never rewrites an existing Snapshot.
 
+## Atomic snapshot capture
+
+The web entry workflow uses `POST /api/v1/snapshot-captures` to synchronize current
+Asset and Liability metadata and create one immutable Snapshot in a single database
+transaction.
+
+- Entries with an existing ID update that active resource; entries without an ID create
+  a resource and receive an identity before capture.
+- The request must include every active Asset and Liability. Missing active identities,
+  duplicate identities, unknown identities, and archived identities are invalid.
+- Every monetary fact must use the request's base currency.
+- Metadata mutations and Snapshot persistence either commit together or roll back
+  together.
+- Omission never archives a resource. Archiving remains an explicit, separately
+  confirmed lifecycle operation.
+- Existing resource CRUD and direct Snapshot creation remain separate public APIs.
+
+## Untrusted assisted-entry data
+
+AI-assisted import is a web-client convenience, not an AI service integration. Wealth OS
+does not transmit prompts or financial data to a model. Agent output is pasted by the
+user, validated locally, previewed, and merged into the unsaved form only after explicit
+confirmation.
+
+Imported data is untrusted. The client accepts only raw JSON or one fenced JSON block,
+uses a strict versioned field allowlist, rejects unknown and prototype-pollution keys,
+limits payload size and position count, and validates identifiers, enums, dates, decimal
+strings, currencies, and field lengths. Imported strings are rendered as text and are
+never executed or inserted as HTML. Server validation remains authoritative.
+
 ## Security boundary
 
 The first API is for local development and a single-user product. Authentication and the

@@ -13,11 +13,24 @@ vi.mock("./api/client", () => api);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.history.replaceState({}, "", "/");
 });
 
 afterEach(cleanup);
 
 describe("Dashboard", () => {
+  it("opens the snapshot requested by the entry workflow", async () => {
+    window.history.replaceState({}, "", "/?snapshot=older");
+    api.listSnapshots.mockResolvedValue({ data: [{ id: "older", asOf: "2026-07-01T00:00:00Z" }, { id: "latest", asOf: "2026-08-01T00:00:00Z" }] });
+    api.getFinancialHealth.mockResolvedValue({ data: { status: "CALCULATED", netWorth: { amount: "150.00", currency: "USD" } } });
+    api.getSnapshot.mockResolvedValue({ data: { assets: [], liabilities: [] } });
+
+    render(<Dashboard />);
+
+    await waitFor(() => expect(api.getSnapshot).toHaveBeenCalledWith({ path: { id: "older" } }));
+    expect((screen.getByRole("combobox", { name: "Snapshot" }) as HTMLSelectElement).value).toBe("older");
+  });
+
   it("shows the latest snapshot financial health and its position details", async () => {
     api.listSnapshots.mockResolvedValue({ data: [{ id: "older", asOf: "2026-07-01T00:00:00Z" }, { id: "latest", asOf: "2026-08-01T00:00:00Z" }] });
     api.getFinancialHealth.mockResolvedValue({ data: { status: "CALCULATED", totalAssets: { amount: "1000.00", currency: "USD" }, totalLiabilities: { amount: "250.00", currency: "USD" }, netWorth: { amount: "750.00", currency: "USD" }, debtRatio: "0.250000", liquidityRatio: "0.600000" } });

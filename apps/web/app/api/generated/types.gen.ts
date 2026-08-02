@@ -114,6 +114,32 @@ export type SnapshotResponse = {
     liabilities?: Array<LiabilityFactResponse>;
 };
 
+export type CaptureAssetRequest = {
+    id?: string | null;
+    name: string;
+    type: 'CASH' | 'INVESTMENT' | 'REAL_ESTATE' | 'VEHICLE' | 'BUSINESS' | 'OTHER';
+    liquidity: 'LIQUID' | 'SEMI_LIQUID' | 'ILLIQUID';
+    money: MoneyRequest;
+    effectiveAt: string;
+    source: string;
+};
+
+export type CaptureLiabilityRequest = {
+    id?: string | null;
+    name: string;
+    money: MoneyRequest;
+    effectiveAt: string;
+    source: string;
+};
+
+export type CaptureSnapshotRequest = {
+    asOf: string;
+    recordedAt: string;
+    baseCurrency: string;
+    assets?: Array<CaptureAssetRequest>;
+    liabilities?: Array<CaptureLiabilityRequest>;
+};
+
 export type CreateLiabilityRequest = {
     name: string;
 };
@@ -296,6 +322,31 @@ export type CreateSnapshotResponses = {
 };
 
 export type CreateSnapshotResponse = CreateSnapshotResponses[keyof CreateSnapshotResponses];
+
+export type CaptureSnapshotData = {
+    body: CaptureSnapshotRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/snapshot-captures';
+};
+
+export type CaptureSnapshotErrors = {
+    /**
+     * Request validation failed
+     */
+    400: ValidationProblemResponse;
+};
+
+export type CaptureSnapshotError = CaptureSnapshotErrors[keyof CaptureSnapshotErrors];
+
+export type CaptureSnapshotResponses = {
+    /**
+     * Snapshot captured
+     */
+    201: SnapshotResponse;
+};
+
+export type CaptureSnapshotResponse = CaptureSnapshotResponses[keyof CaptureSnapshotResponses];
 
 export type ListLiabilitiesData = {
     body?: never;
