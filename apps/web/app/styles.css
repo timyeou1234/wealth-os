@@ -1,0 +1,15 @@
+:root { color: #e8edf5; background: #0d1320; font-family: Arial, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.dashboard { max-width: 1100px; margin: 0 auto; padding: 56px 24px; }
+header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 40px; }
+h1 { margin: 0; font-size: 2.25rem; }
+.eyebrow, .card p, label { color: #aeb9ca; font-size: .9rem; }
+.eyebrow { margin: 0 0 8px; text-transform: uppercase; letter-spacing: .08em; }
+label { display: grid; gap: 8px; }
+select { background: #182237; border: 1px solid #31415f; border-radius: 8px; color: inherit; padding: 10px; }
+.cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.card { background: #151e30; border: 1px solid #263551; border-radius: 12px; padding: 20px; min-height: 130px; }
+.card p { margin: 0 0 18px; }.card strong { font-size: 1.45rem; }.emphasis { background: #1e3455; border-color: #4d8ad5; }
+@media (max-width: 800px) { .cards { grid-template-columns: repeat(2, 1fr); } header { align-items: start; flex-direction: column; } }
+@media (max-width: 480px) { .cards { grid-template-columns: 1fr; } .dashboard { padding: 32px 16px; } }
