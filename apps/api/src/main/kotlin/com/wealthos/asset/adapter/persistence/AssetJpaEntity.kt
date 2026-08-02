@@ -17,4 +17,6 @@ class AssetJpaEntity(
     val assetType: String,
     @Column(nullable = false)
     val liquidity: String,
+    @Column(nullable = false)
+    val archived: Boolean,
 )

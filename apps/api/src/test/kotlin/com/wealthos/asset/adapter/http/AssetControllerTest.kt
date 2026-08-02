@@ -14,6 +14,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.springframework.transaction.annotation.Transactional
 
 @SpringBootTest(
@@ -108,6 +109,64 @@ class AssetControllerTest {
                 jsonPath("$[0].name") { value("Emergency Fund") }
                 jsonPath("$[0].type") { value("CASH") }
                 jsonPath("$[0].liquidity") { value("LIQUID") }
+            }
+    }
+
+    @Test
+    fun `user can update an asset metadata`() {
+        val asset =
+            assetRepository.save(
+                Asset(AssetId.new(), "Savings", AssetType.CASH, Liquidity.LIQUID),
+            )
+
+        mockMvc.put("/api/v1/assets/${asset.id.value}") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "name": "Brokerage Account",
+                  "type": "INVESTMENT",
+                  "liquidity": "SEMI_LIQUID"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(asset.id.value.toString()) }
+            jsonPath("$.name") { value("Brokerage Account") }
+            jsonPath("$.type") { value("INVESTMENT") }
+            jsonPath("$.liquidity") { value("SEMI_LIQUID") }
+        }
+
+        mockMvc.get("/api/v1/assets/${asset.id.value}")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name") { value("Brokerage Account") }
+                jsonPath("$.type") { value("INVESTMENT") }
+                jsonPath("$.liquidity") { value("SEMI_LIQUID") }
+            }
+    }
+
+    @Test
+    fun `user can archive an asset without removing its resource`() {
+        val asset =
+            assetRepository.save(
+                Asset(AssetId.new(), "Old Account", AssetType.CASH, Liquidity.LIQUID),
+            )
+
+        mockMvc.post("/api/v1/assets/${asset.id.value}/archive")
+            .andExpect { status { isNoContent() } }
+
+        mockMvc.get("/api/v1/assets")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(0) }
+            }
+
+        mockMvc.get("/api/v1/assets/${asset.id.value}")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value(asset.id.value.toString()) }
+                jsonPath("$.archived") { value(true) }
             }
     }
 

@@ -19,11 +19,13 @@ class JpaLiabilityRepository(
         LiabilityJpaEntity(
             id = id.value,
             name = name,
+            archived = archived,
         )
 
     private fun LiabilityJpaEntity.toDomain(): Liability =
         Liability(
             id = LiabilityId(id),
             name = name,
+            archived = archived,
         )
 }

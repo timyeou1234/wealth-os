@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { Create1Data, Create1Errors, Create1Responses, Create2Data, Create2Errors, Create2Responses, CreateData, CreateResponses, Get1Data, Get1Errors, Get1Responses, Get2Data, Get2Responses, Get3Data, Get3Errors, Get3Responses, GetData, GetResponses, List1Data, List1Responses, List2Data, List2Responses, ListData, ListResponses } from './types.gen';
+import type { ArchiveAssetData, ArchiveAssetErrors, ArchiveAssetResponses, ArchiveLiabilityData, ArchiveLiabilityErrors, ArchiveLiabilityResponses, CreateAssetData, CreateAssetErrors, CreateAssetResponses, CreateLiabilityData, CreateLiabilityErrors, CreateLiabilityResponses, CreateSnapshotData, CreateSnapshotResponses, GetAssetData, GetAssetErrors, GetAssetResponses, GetFinancialHealthData, GetFinancialHealthResponses, GetLiabilityData, GetLiabilityErrors, GetLiabilityResponses, GetSnapshotData, GetSnapshotResponses, ListAssetsData, ListAssetsResponses, ListLiabilitiesData, ListLiabilitiesResponses, ListSnapshotsData, ListSnapshotsResponses, UpdateAssetData, UpdateAssetErrors, UpdateAssetResponses, UpdateLiabilityData, UpdateLiabilityErrors, UpdateLiabilityResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,14 +19,48 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
+ * Get a liability
+ */
+export const getLiability = <ThrowOnError extends boolean = false>(options: Options<GetLiabilityData, ThrowOnError>): RequestResult<GetLiabilityResponses, GetLiabilityErrors, ThrowOnError> => (options.client ?? client).get<GetLiabilityResponses, GetLiabilityErrors, ThrowOnError>({ url: '/api/v1/liabilities/{id}', ...options });
+
+/**
+ * Update a liability
+ */
+export const updateLiability = <ThrowOnError extends boolean = false>(options: Options<UpdateLiabilityData, ThrowOnError>): RequestResult<UpdateLiabilityResponses, UpdateLiabilityErrors, ThrowOnError> => (options.client ?? client).put<UpdateLiabilityResponses, UpdateLiabilityErrors, ThrowOnError>({
+    url: '/api/v1/liabilities/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get an asset
+ */
+export const getAsset = <ThrowOnError extends boolean = false>(options: Options<GetAssetData, ThrowOnError>): RequestResult<GetAssetResponses, GetAssetErrors, ThrowOnError> => (options.client ?? client).get<GetAssetResponses, GetAssetErrors, ThrowOnError>({ url: '/api/v1/assets/{id}', ...options });
+
+/**
+ * Update an asset
+ */
+export const updateAsset = <ThrowOnError extends boolean = false>(options: Options<UpdateAssetData, ThrowOnError>): RequestResult<UpdateAssetResponses, UpdateAssetErrors, ThrowOnError> => (options.client ?? client).put<UpdateAssetResponses, UpdateAssetErrors, ThrowOnError>({
+    url: '/api/v1/assets/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List effective snapshots
  */
-export const list = <ThrowOnError extends boolean = false>(options?: Options<ListData, ThrowOnError>): RequestResult<ListResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListResponses, unknown, ThrowOnError>({ url: '/api/v1/snapshots', ...options });
+export const listSnapshots = <ThrowOnError extends boolean = false>(options?: Options<ListSnapshotsData, ThrowOnError>): RequestResult<ListSnapshotsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListSnapshotsResponses, unknown, ThrowOnError>({ url: '/api/v1/snapshots', ...options });
 
 /**
  * Create a snapshot
  */
-export const create = <ThrowOnError extends boolean = false>(options: Options<CreateData, ThrowOnError>): RequestResult<CreateResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateResponses, unknown, ThrowOnError>({
+export const createSnapshot = <ThrowOnError extends boolean = false>(options: Options<CreateSnapshotData, ThrowOnError>): RequestResult<CreateSnapshotResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateSnapshotResponses, unknown, ThrowOnError>({
     url: '/api/v1/snapshots',
     ...options,
     headers: {
@@ -38,12 +72,12 @@ export const create = <ThrowOnError extends boolean = false>(options: Options<Cr
 /**
  * List liabilities
  */
-export const list1 = <ThrowOnError extends boolean = false>(options?: Options<List1Data, ThrowOnError>): RequestResult<List1Responses, unknown, ThrowOnError> => (options?.client ?? client).get<List1Responses, unknown, ThrowOnError>({ url: '/api/v1/liabilities', ...options });
+export const listLiabilities = <ThrowOnError extends boolean = false>(options?: Options<ListLiabilitiesData, ThrowOnError>): RequestResult<ListLiabilitiesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListLiabilitiesResponses, unknown, ThrowOnError>({ url: '/api/v1/liabilities', ...options });
 
 /**
  * Create a liability
  */
-export const create1 = <ThrowOnError extends boolean = false>(options: Options<Create1Data, ThrowOnError>): RequestResult<Create1Responses, Create1Errors, ThrowOnError> => (options.client ?? client).post<Create1Responses, Create1Errors, ThrowOnError>({
+export const createLiability = <ThrowOnError extends boolean = false>(options: Options<CreateLiabilityData, ThrowOnError>): RequestResult<CreateLiabilityResponses, CreateLiabilityErrors, ThrowOnError> => (options.client ?? client).post<CreateLiabilityResponses, CreateLiabilityErrors, ThrowOnError>({
     url: '/api/v1/liabilities',
     ...options,
     headers: {
@@ -53,14 +87,19 @@ export const create1 = <ThrowOnError extends boolean = false>(options: Options<C
 });
 
 /**
+ * Archive a liability
+ */
+export const archiveLiability = <ThrowOnError extends boolean = false>(options: Options<ArchiveLiabilityData, ThrowOnError>): RequestResult<ArchiveLiabilityResponses, ArchiveLiabilityErrors, ThrowOnError> => (options.client ?? client).post<ArchiveLiabilityResponses, ArchiveLiabilityErrors, ThrowOnError>({ url: '/api/v1/liabilities/{id}/archive', ...options });
+
+/**
  * List assets
  */
-export const list2 = <ThrowOnError extends boolean = false>(options?: Options<List2Data, ThrowOnError>): RequestResult<List2Responses, unknown, ThrowOnError> => (options?.client ?? client).get<List2Responses, unknown, ThrowOnError>({ url: '/api/v1/assets', ...options });
+export const listAssets = <ThrowOnError extends boolean = false>(options?: Options<ListAssetsData, ThrowOnError>): RequestResult<ListAssetsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListAssetsResponses, unknown, ThrowOnError>({ url: '/api/v1/assets', ...options });
 
 /**
  * Create an asset
  */
-export const create2 = <ThrowOnError extends boolean = false>(options: Options<Create2Data, ThrowOnError>): RequestResult<Create2Responses, Create2Errors, ThrowOnError> => (options.client ?? client).post<Create2Responses, Create2Errors, ThrowOnError>({
+export const createAsset = <ThrowOnError extends boolean = false>(options: Options<CreateAssetData, ThrowOnError>): RequestResult<CreateAssetResponses, CreateAssetErrors, ThrowOnError> => (options.client ?? client).post<CreateAssetResponses, CreateAssetErrors, ThrowOnError>({
     url: '/api/v1/assets',
     ...options,
     headers: {
@@ -70,21 +109,16 @@ export const create2 = <ThrowOnError extends boolean = false>(options: Options<C
 });
 
 /**
- * Get a snapshot
+ * Archive an asset
  */
-export const get = <ThrowOnError extends boolean = false>(options: Options<GetData, ThrowOnError>): RequestResult<GetResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetResponses, unknown, ThrowOnError>({ url: '/api/v1/snapshots/{id}', ...options });
+export const archiveAsset = <ThrowOnError extends boolean = false>(options: Options<ArchiveAssetData, ThrowOnError>): RequestResult<ArchiveAssetResponses, ArchiveAssetErrors, ThrowOnError> => (options.client ?? client).post<ArchiveAssetResponses, ArchiveAssetErrors, ThrowOnError>({ url: '/api/v1/assets/{id}/archive', ...options });
 
 /**
- * Get a liability
+ * Get a snapshot
  */
-export const get1 = <ThrowOnError extends boolean = false>(options: Options<Get1Data, ThrowOnError>): RequestResult<Get1Responses, Get1Errors, ThrowOnError> => (options.client ?? client).get<Get1Responses, Get1Errors, ThrowOnError>({ url: '/api/v1/liabilities/{id}', ...options });
+export const getSnapshot = <ThrowOnError extends boolean = false>(options: Options<GetSnapshotData, ThrowOnError>): RequestResult<GetSnapshotResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetSnapshotResponses, unknown, ThrowOnError>({ url: '/api/v1/snapshots/{id}', ...options });
 
 /**
  * Get financial health for a snapshot
  */
-export const get2 = <ThrowOnError extends boolean = false>(options: Options<Get2Data, ThrowOnError>): RequestResult<Get2Responses, unknown, ThrowOnError> => (options.client ?? client).get<Get2Responses, unknown, ThrowOnError>({ url: '/api/v1/financial-health/{snapshotId}', ...options });
-
-/**
- * Get an asset
- */
-export const get3 = <ThrowOnError extends boolean = false>(options: Options<Get3Data, ThrowOnError>): RequestResult<Get3Responses, Get3Errors, ThrowOnError> => (options.client ?? client).get<Get3Responses, Get3Errors, ThrowOnError>({ url: '/api/v1/assets/{id}', ...options });
+export const getFinancialHealth = <ThrowOnError extends boolean = false>(options: Options<GetFinancialHealthData, ThrowOnError>): RequestResult<GetFinancialHealthResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetFinancialHealthResponses, unknown, ThrowOnError>({ url: '/api/v1/financial-health/{snapshotId}', ...options });

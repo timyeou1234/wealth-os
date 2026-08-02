@@ -3,6 +3,7 @@ package com.wealthos.domain.liability
 class Liability(
     val id: LiabilityId,
     name: String,
+    val archived: Boolean = false,
 ) {
     val name: String = name.trim()
 

@@ -38,18 +38,18 @@ import java.util.UUID
 @Tag(name = "Snapshots")
 class SnapshotController(private val snapshots: SnapshotApplication) {
     @GetMapping
-    @Operation(summary = "List effective snapshots")
+    @Operation(summary = "List effective snapshots", operationId = "listSnapshots")
     fun list(): List<SnapshotResponse> = snapshots.list().map(SnapshotResponse::from)
 
     @PostMapping
-    @Operation(summary = "Create a snapshot")
+    @Operation(summary = "Create a snapshot", operationId = "createSnapshot")
     fun create(@Valid @RequestBody request: CreateSnapshotRequest): ResponseEntity<SnapshotResponse> {
         val snapshot = snapshots.save(request.toDomain())
         return ResponseEntity.created(URI.create("/api/v1/snapshots/${snapshot.id.value}")).body(SnapshotResponse.from(snapshot))
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a snapshot")
+    @Operation(summary = "Get a snapshot", operationId = "getSnapshot")
     fun get(@PathVariable id: UUID): SnapshotResponse = SnapshotResponse.from(snapshots.get(SnapshotId(id)))
 }
 

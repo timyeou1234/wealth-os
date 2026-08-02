@@ -8,5 +8,5 @@ import org.springframework.stereotype.Service
 class ListAssets(
     private val assetRepository: AssetRepository,
 ) {
-    fun execute(): List<Asset> = assetRepository.findAll().sortedBy { it.name.lowercase() }
+    fun execute(): List<Asset> = assetRepository.findAll().filterNot { it.archived }.sortedBy { it.name.lowercase() }
 }

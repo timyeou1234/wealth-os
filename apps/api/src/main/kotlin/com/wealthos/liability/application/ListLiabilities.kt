@@ -8,5 +8,5 @@ import org.springframework.stereotype.Service
 class ListLiabilities(
     private val liabilityRepository: LiabilityRepository,
 ) {
-    fun execute(): List<Liability> = liabilityRepository.findAll().sortedBy { it.name.lowercase() }
+    fun execute(): List<Liability> = liabilityRepository.findAll().filterNot { it.archived }.sortedBy { it.name.lowercase() }
 }

@@ -56,4 +56,37 @@ class ApiDocumentationConfigurationTest {
                 }
             }
     }
+
+    @Test
+    fun `documents asset and liability lifecycle operations`() {
+        mockMvc.get("/v3/api-docs")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.paths['/api/v1/assets'].get.operationId") { value("listAssets") }
+                jsonPath("$.paths['/api/v1/assets/{id}'].get.operationId") { value("getAsset") }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.operationId") { value("updateAsset") }
+                jsonPath("$.paths['/api/v1/assets/{id}/archive'].post.operationId") { value("archiveAsset") }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.responses['200']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.responses['200'].content['application/json'].schema['\$ref']") { value("#/components/schemas/AssetResponse") }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.responses['400']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}'].put.responses['404']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}/archive'].post.responses['204']") { exists() }
+                jsonPath("$.paths['/api/v1/assets/{id}/archive'].post.responses['404']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.responses['200']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.responses['200'].content['application/json'].schema['\$ref']") { value("#/components/schemas/LiabilityResponse") }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.responses['400']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.responses['404']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}/archive'].post.responses['204']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities/{id}/archive'].post.responses['404']") { exists() }
+                jsonPath("$.paths['/api/v1/liabilities'].get.operationId") { value("listLiabilities") }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].get.operationId") { value("getLiability") }
+                jsonPath("$.paths['/api/v1/liabilities/{id}'].put.operationId") { value("updateLiability") }
+                jsonPath("$.paths['/api/v1/liabilities/{id}/archive'].post.operationId") { value("archiveLiability") }
+                jsonPath("$.paths['/api/v1/snapshots'].get.operationId") { value("listSnapshots") }
+                jsonPath("$.paths['/api/v1/snapshots/{id}'].get.operationId") { value("getSnapshot") }
+                jsonPath("$.paths['/api/v1/financial-health/{snapshotId}'].get.operationId") {
+                    value("getFinancialHealth")
+                }
+            }
+    }
 }
