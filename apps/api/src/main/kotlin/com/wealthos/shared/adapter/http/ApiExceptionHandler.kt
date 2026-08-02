@@ -13,6 +13,10 @@ import java.net.URI
 
 @RestControllerAdvice
 class ApiExceptionHandler {
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleInvalidDomainInput(request: HttpServletRequest): ResponseEntity<ValidationProblemResponse> =
+        validationProblem(request, "One or more fields are invalid", listOf(FieldValidationError("request", "contains invalid values")))
+
     @ExceptionHandler(MethodArgumentTypeMismatchException::class)
     fun handleTypeMismatch(
         exception: MethodArgumentTypeMismatchException,
