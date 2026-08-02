@@ -37,6 +37,10 @@ import java.util.UUID
 @RequestMapping("/api/v1/snapshots")
 @Tag(name = "Snapshots")
 class SnapshotController(private val snapshots: SnapshotApplication) {
+    @GetMapping
+    @Operation(summary = "List effective snapshots")
+    fun list(): List<SnapshotResponse> = snapshots.list().map(SnapshotResponse::from)
+
     @PostMapping
     @Operation(summary = "Create a snapshot")
     fun create(@Valid @RequestBody request: CreateSnapshotRequest): ResponseEntity<SnapshotResponse> {

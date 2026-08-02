@@ -12,6 +12,8 @@ class SnapshotApplication(
     fun save(snapshot: Snapshot): Snapshot = repository.save(snapshot)
 
     fun get(id: SnapshotId): Snapshot = repository.findEffectiveById(id) ?: throw SnapshotNotFoundException(id)
+
+    fun list(): List<Snapshot> = repository.findAllEffective()
 }
 
 class SnapshotNotFoundException(val snapshotId: SnapshotId) : RuntimeException("Snapshot $snapshotId was not found")

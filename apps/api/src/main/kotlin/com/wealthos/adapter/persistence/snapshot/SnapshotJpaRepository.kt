@@ -11,4 +11,6 @@ interface SnapshotJpaRepository : JpaRepository<SnapshotJpaEntity, UUID> {
         fromInclusive: Instant,
         toExclusive: Instant,
     ): List<SnapshotJpaEntity>
+
+    fun findAllBySupersedesIdIsNullOrderByAsOfAsc(): List<SnapshotJpaEntity>
 }

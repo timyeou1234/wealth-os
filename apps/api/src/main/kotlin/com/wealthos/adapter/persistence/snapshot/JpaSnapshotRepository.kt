@@ -63,6 +63,10 @@ class JpaSnapshotRepository(
             ).map { load(findTerminal(it)) }
     }
 
+    @Transactional(readOnly = true)
+    override fun findAllEffective(): List<Snapshot> =
+        snapshots.findAllBySupersedesIdIsNullOrderByAsOfAsc().map { load(findTerminal(it)) }
+
     private fun findTerminal(start: SnapshotJpaEntity): SnapshotJpaEntity {
         var current = start
         val visited = mutableSetOf<UUID>()

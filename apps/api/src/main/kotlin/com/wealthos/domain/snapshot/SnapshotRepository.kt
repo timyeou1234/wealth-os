@@ -13,4 +13,6 @@ interface SnapshotRepository {
         fromInclusive: Instant,
         toExclusive: Instant,
     ): List<Snapshot>
+
+    fun findAllEffective(): List<Snapshot>
 }
