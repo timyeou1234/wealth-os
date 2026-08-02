@@ -1,5 +1,6 @@
 package com.wealthos.shared.adapter.http
 
+import com.wealthos.shared.application.RequestValidationException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.MediaType
 import org.springframework.http.HttpStatus
@@ -13,6 +14,17 @@ import java.net.URI
 
 @RestControllerAdvice
 class ApiExceptionHandler {
+    @ExceptionHandler(RequestValidationException::class)
+    fun handleRequestValidation(
+        exception: RequestValidationException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ValidationProblemResponse> =
+        validationProblem(
+            request,
+            "One or more fields are invalid",
+            exception.errors.map { FieldValidationError(it.field, it.message) },
+        )
+
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleInvalidDomainInput(request: HttpServletRequest): ResponseEntity<ValidationProblemResponse> =
         validationProblem(request, "One or more fields are invalid", listOf(FieldValidationError("request", "contains invalid values")))

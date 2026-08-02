@@ -130,7 +130,7 @@ export default function EntryPage() {
   const applyImport = () => {
     if (!importReview) return;
     const data = importReview.data;
-    if (data.baseCurrency) setBaseCurrency(data.baseCurrency);
+    setBaseCurrency(data.baseCurrency);
     if (data.snapshotDate) setSnapshotDate(data.snapshotDate);
     setAssets((current) => mergeAssets(current, data, nextKey));
     setLiabilities((current) => mergeLiabilities(current, data, nextKey));
@@ -249,7 +249,7 @@ function AssetFields({ draft, isNew, snapshotDate, showValidation, onChange, onA
     <label>Liquidity<select aria-label={isNew ? "Liquidity" : `${label} liquidity`} aria-invalid={invalidLiquidity || undefined} value={draft.liquidity} onChange={(event) => onChange({ ...draft, liquidity: event.target.value as Liquidity | "" })} required><option value="">Choose liquidity</option>{liquidities.map((value) => <option key={value}>{value}</option>)}</select>{invalidLiquidity && <span className="field-error">Liquidity is required.</span>}</label>
     <label>Amount<input aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
     <label>Effective date<input aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
-    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={1000} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
+    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
     {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
     {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
   </fieldset>;
@@ -265,7 +265,7 @@ function LiabilityFields({ draft, isNew, snapshotDate, showValidation, onChange,
     <label>Name<input aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
     <label>Amount<input aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
     <label>Effective date<input aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
-    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={1000} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
+    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
     {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
     {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
   </fieldset>;
@@ -323,7 +323,7 @@ function mergeLiabilities(current: LiabilityDraft[], imported: AgentImport, next
 function buildPrompt(includeDraft: boolean, snapshotDate: string, baseCurrency: string, assets: AssetDraft[], liabilities: LiabilityDraft[]): string {
   const shape = {
     schemaVersion: 1,
-    baseCurrency: baseCurrency || "TWD",
+    baseCurrency: "TWD",
     snapshotDate,
     assets: [{ name: "Example asset", type: "CASH", liquidity: "LIQUID", amount: "1000.00", effectiveDate: snapshotDate, source: "Statement description" }],
     liabilities: [{ name: "Example liability", amount: "250.00", effectiveDate: snapshotDate, source: "Statement description" }],

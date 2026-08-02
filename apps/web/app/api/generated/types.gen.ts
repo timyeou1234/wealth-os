@@ -136,8 +136,8 @@ export type CaptureSnapshotRequest = {
     asOf: string;
     recordedAt: string;
     baseCurrency: string;
-    assets?: Array<CaptureAssetRequest>;
-    liabilities?: Array<CaptureLiabilityRequest>;
+    assets: Array<CaptureAssetRequest>;
+    liabilities: Array<CaptureLiabilityRequest>;
 };
 
 export type CreateLiabilityRequest = {

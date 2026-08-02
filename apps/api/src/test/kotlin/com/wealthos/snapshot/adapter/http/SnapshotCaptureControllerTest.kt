@@ -148,6 +148,8 @@ class SnapshotCaptureControllerTest {
                 """.trimIndent()
         }.andExpect {
             status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets[0].money.amount") }
+            jsonPath("$.errors[0].message") { value("must be a non-negative decimal amount") }
         }
 
         mockMvc.get("/api/v1/assets/$assetId")
@@ -161,6 +163,29 @@ class SnapshotCaptureControllerTest {
                 status { isOk() }
                 jsonPath("$.length()") { value(0) }
             }
+    }
+
+    @Test
+    fun `capture identifies an incomplete active set`() {
+        createResource("/api/v1/assets", """{"name":"Cash","type":"CASH","liquidity":"LIQUID"}""")
+
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-02T00:00:00Z",
+                  "recordedAt":"2026-08-02T08:00:00Z",
+                  "baseCurrency":"USD",
+                  "assets":[],
+                  "liabilities":[]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets") }
+            jsonPath("$.errors[0].message") { value("must include every active asset exactly once") }
+        }
     }
 
     private fun createResource(

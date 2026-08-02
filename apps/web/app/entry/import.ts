@@ -18,7 +18,7 @@ export type AgentImportLiability = {
 
 export type AgentImport = {
   schemaVersion: 1;
-  baseCurrency?: string;
+  baseCurrency: string;
   snapshotDate?: string;
   assets: AgentImportAsset[];
   liabilities: AgentImportLiability[];
@@ -44,8 +44,8 @@ export function parseAgentImport(input: string, knownAssetIds: Set<string>, know
   const root = object(value, "Import");
   allow(root, ["schemaVersion", "baseCurrency", "snapshotDate", "assets", "liabilities"], "Import");
   if (root.schemaVersion !== 1) throw new Error("schemaVersion must be 1.");
-  const baseCurrency = optionalString(root.baseCurrency, "baseCurrency", 3);
-  if (baseCurrency !== undefined && !/^[A-Z]{3}$/.test(baseCurrency)) throw new Error("baseCurrency must be a three-letter uppercase currency code.");
+  const baseCurrency = requiredString(root.baseCurrency, "baseCurrency", 3);
+  if (!/^[A-Z]{3}$/.test(baseCurrency)) throw new Error("baseCurrency must be a three-letter uppercase currency code.");
   const snapshotDate = optionalDate(root.snapshotDate, "snapshotDate");
   const rawAssets = array(root.assets, "assets");
   const rawLiabilities = array(root.liabilities, "liabilities");
@@ -55,7 +55,7 @@ export function parseAgentImport(input: string, knownAssetIds: Set<string>, know
   const liabilities = rawLiabilities.map((item, index) => parseLiability(item, index, knownLiabilityIds));
   duplicateIds(assets, "asset");
   duplicateIds(liabilities, "liability");
-  return { schemaVersion: 1, ...(baseCurrency ? { baseCurrency } : {}), ...(snapshotDate ? { snapshotDate } : {}), assets, liabilities };
+  return { schemaVersion: 1, baseCurrency, ...(snapshotDate ? { snapshotDate } : {}), assets, liabilities };
 }
 
 function parseAsset(value: unknown, index: number, knownIds: Set<string>): AgentImportAsset {
@@ -74,7 +74,7 @@ function parseAsset(value: unknown, index: number, knownIds: Set<string>): Agent
     liquidity: liquidity as AgentImportAsset["liquidity"],
     amount: amount(item.amount, `${label}.amount`),
     effectiveDate: requiredDate(item.effectiveDate, `${label}.effectiveDate`),
-    source: requiredString(item.source, `${label}.source`, 1000),
+    source: requiredString(item.source, `${label}.source`, 100),
   };
 }
 
@@ -88,13 +88,13 @@ function parseLiability(value: unknown, index: number, knownIds: Set<string>): A
     name: requiredString(item.name, `${label}.name`, 200),
     amount: amount(item.amount, `${label}.amount`),
     effectiveDate: requiredDate(item.effectiveDate, `${label}.effectiveDate`),
-    source: requiredString(item.source, `${label}.source`, 1000),
+    source: requiredString(item.source, `${label}.source`, 100),
   };
 }
 
 function unwrap(input: string): string {
   if (!input.startsWith("```")) return input;
-  const match = input.match(/^```json\s*\n([\s\S]*?)\n```$/i);
+  const match = input.match(/^```(?:json)?[ \t]*\n([\s\S]*?)\n```$/i);
   if (!match) throw new Error("Agent output must contain exactly one JSON code block without extra text.");
   return match[1];
 }
@@ -121,11 +121,6 @@ function requiredString(value: unknown, label: string, maxLength: number): strin
   if (typeof value !== "string" || value.trim().length === 0) throw new Error(`${label} is required.`);
   if (value.length > maxLength) throw new Error(`${label} is too long.`);
   return value;
-}
-
-function optionalString(value: unknown, label: string, maxLength: number): string | undefined {
-  if (value === undefined) return undefined;
-  return requiredString(value, label, maxLength);
 }
 
 function amount(value: unknown, label: string): string {

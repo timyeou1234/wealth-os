@@ -49,6 +49,7 @@ describe("Balance-sheet entry", () => {
 
     const prompt = await screen.findByLabelText("AI Prompt") as HTMLTextAreaElement;
     expect(prompt.value).not.toContain("Cash");
+    expect(prompt.value).not.toContain('"baseCurrency": "USD"');
     fireEvent.click(screen.getByLabelText("Include current draft in Prompt"));
     expect(prompt.value).toContain(assetId);
     expect(screen.getByText("This Prompt contains sensitive financial data.")).toBeTruthy();
@@ -81,11 +82,44 @@ describe("Balance-sheet entry", () => {
     expect(api.captureSnapshot).not.toHaveBeenCalled();
   });
 
+  it("accepts one unlabeled fenced JSON block", async () => {
+    render(<EntryPage />);
+    await screen.findByLabelText("Cash amount");
+
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `\`\`\`
+{
+  "schemaVersion": 1,
+  "baseCurrency": "USD",
+  "assets": [],
+  "liabilities": []
+}
+\`\`\`` } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect(screen.getByRole("dialog", { name: "Review AI import" })).toBeTruthy();
+  });
+
+  it("requires a validated currency in agent output", async () => {
+    render(<EntryPage />);
+    await screen.findByLabelText("Cash amount");
+
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
+      "schemaVersion": 1,
+      "assets": [],
+      "liabilities": []
+    }` } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("baseCurrency is required");
+    expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
+  });
+
   it("rejects unknown IDs and injection-shaped fields without changing the draft", async () => {
     render(<EntryPage />);
     await screen.findByLabelText("Cash amount");
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
       "schemaVersion": 1,
+      "baseCurrency": "USD",
       "assets": [{
         "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         "name": "<img src=x onerror=alert(1)>",

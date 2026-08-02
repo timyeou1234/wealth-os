@@ -103,6 +103,9 @@ class ApiDocumentationConfigurationTest {
                     value("#/components/schemas/ValidationProblemResponse")
                 }
                 jsonPath("$.paths['/api/v1/snapshot-captures'].post.responses['200']") { doesNotExist() }
+                jsonPath("$.components.schemas.CaptureSnapshotRequest.required") {
+                    value(org.hamcrest.Matchers.hasItems("assets", "liabilities"))
+                }
             }
     }
 }

@@ -17,6 +17,7 @@ import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotRepository
+import com.wealthos.shared.application.RequestValidationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -29,23 +30,22 @@ class CaptureSnapshot(
 ) {
     @Transactional
     fun execute(command: CaptureSnapshotCommand): Snapshot {
+        if (command.recordedAt.isBefore(command.asOf)) {
+            throw RequestValidationException("recordedAt", "must not be before asOf")
+        }
         val activeAssets = assets.findAll().filterNot(Asset::archived)
         val activeLiabilities = liabilities.findAll().filterNot(Liability::archived)
-        requireCompleteActiveSet(activeAssets.map(Asset::id).toSet(), command.assets.mapNotNull(CaptureAsset::id), "Asset")
-        requireCompleteActiveSet(activeLiabilities.map(Liability::id).toSet(), command.liabilities.mapNotNull(CaptureLiability::id), "Liability")
+        validateAssetIds(command.assets)
+        validateLiabilityIds(command.liabilities)
+        requireCompleteActiveSet(activeAssets.map(Asset::id).toSet(), command.assets.mapNotNull(CaptureAsset::id), "assets", "asset")
+        requireCompleteActiveSet(activeLiabilities.map(Liability::id).toSet(), command.liabilities.mapNotNull(CaptureLiability::id), "liabilities", "liability")
 
         val capturedAssets =
             command.assets.map { input ->
-                input.id?.let { id ->
-                    require(assets.findById(id)?.archived == false) { "Asset must exist and be active: $id" }
-                }
                 assets.save(Asset(input.id ?: AssetId.new(), input.name, input.type, input.liquidity))
             }
         val capturedLiabilities =
             command.liabilities.map { input ->
-                input.id?.let { id ->
-                    require(liabilities.findById(id)?.archived == false) { "Liability must exist and be active: $id" }
-                }
                 liabilities.save(Liability(input.id ?: LiabilityId.new(), input.name))
             }
 
@@ -56,14 +56,14 @@ class CaptureSnapshot(
                 recordedAt = command.recordedAt,
                 assets = capturedAssets,
                 assetValuations =
-                    capturedAssets.zip(command.assets).map { (asset, input) ->
-                        require(input.money.currency == command.baseCurrency) { "Asset currency must match the base currency" }
+                    capturedAssets.zip(command.assets).mapIndexed { index, (asset, input) ->
+                        validateFact(input.money, input.effectiveAt, command, "assets[$index]")
                         AssetValuation(asset.id, input.money, input.effectiveAt, input.source)
                     },
                 liabilities = capturedLiabilities,
                 liabilityBalances =
-                    capturedLiabilities.zip(command.liabilities).map { (liability, input) ->
-                        require(input.money.currency == command.baseCurrency) { "Liability currency must match the base currency" }
+                    capturedLiabilities.zip(command.liabilities).mapIndexed { index, (liability, input) ->
+                        validateFact(input.money, input.effectiveAt, command, "liabilities[$index]")
                         LiabilityBalance(liability.id, input.money, input.effectiveAt, input.source)
                     },
             )
@@ -73,10 +73,52 @@ class CaptureSnapshot(
     private fun <T> requireCompleteActiveSet(
         activeIds: Set<T>,
         submittedIds: List<T>,
+        field: String,
         resource: String,
     ) {
-        require(submittedIds.size == submittedIds.toSet().size) { "$resource IDs must not be duplicated" }
-        require(submittedIds.toSet() == activeIds) { "Capture must include every active $resource" }
+        if (submittedIds.size != submittedIds.toSet().size) {
+            throw RequestValidationException(field, "must not contain duplicate $resource IDs")
+        }
+        if (submittedIds.toSet() != activeIds) {
+            throw RequestValidationException(field, "must include every active $resource exactly once")
+        }
+    }
+
+    private fun validateAssetIds(inputs: List<CaptureAsset>) {
+        inputs.forEachIndexed { index, input ->
+            input.id?.let { id ->
+                if (assets.findById(id)?.archived != false) {
+                    throw RequestValidationException("assets[$index].id", "must identify an active asset")
+                }
+            }
+        }
+    }
+
+    private fun validateLiabilityIds(inputs: List<CaptureLiability>) {
+        inputs.forEachIndexed { index, input ->
+            input.id?.let { id ->
+                if (liabilities.findById(id)?.archived != false) {
+                    throw RequestValidationException("liabilities[$index].id", "must identify an active liability")
+                }
+            }
+        }
+    }
+
+    private fun validateFact(
+        money: Money,
+        effectiveAt: Instant,
+        command: CaptureSnapshotCommand,
+        field: String,
+    ) {
+        if (money.currency != command.baseCurrency) {
+            throw RequestValidationException("$field.money.currency", "must match baseCurrency")
+        }
+        if (money.amount.signum() < 0) {
+            throw RequestValidationException("$field.money.amount", "must be a non-negative decimal amount")
+        }
+        if (effectiveAt.isAfter(command.asOf)) {
+            throw RequestValidationException("$field.effectiveAt", "must not be after asOf")
+        }
     }
 }
 

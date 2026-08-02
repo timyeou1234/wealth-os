@@ -13,6 +13,7 @@ import com.wealthos.snapshot.application.CaptureLiability
 import com.wealthos.snapshot.application.CaptureSnapshot
 import com.wealthos.snapshot.application.CaptureSnapshotCommand
 import com.wealthos.shared.adapter.http.ValidationProblemResponse
+import com.wealthos.shared.application.RequestValidationException
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -22,7 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
-import jakarta.validation.constraints.Pattern
+import jakarta.validation.constraints.Size
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -59,17 +60,17 @@ data class CaptureSnapshotRequest(
     @field:NotNull val asOf: Instant,
     @field:NotNull val recordedAt: Instant,
     @field:NotBlank val baseCurrency: String,
-    @field:Valid val assets: List<CaptureAssetRequest> = emptyList(),
-    @field:Valid val liabilities: List<CaptureLiabilityRequest> = emptyList(),
+    @field:Valid @field:NotNull val assets: List<CaptureAssetRequest>,
+    @field:Valid @field:NotNull val liabilities: List<CaptureLiabilityRequest>,
 ) {
     fun toCommand(): CaptureSnapshotCommand {
-        val currency = Currency.of(baseCurrency)
+        val currency = validated("baseCurrency", "must be a supported ISO 4217 currency") { Currency.of(baseCurrency) }
         return CaptureSnapshotCommand(
             asOf = asOf,
             recordedAt = recordedAt,
             baseCurrency = currency,
-            assets = assets.map { it.toCommand(currency) },
-            liabilities = liabilities.map { it.toCommand(currency) },
+            assets = assets.mapIndexed { index, asset -> asset.toCommand(currency, index) },
+            liabilities = liabilities.mapIndexed { index, liability -> liability.toCommand(currency, index) },
         )
     }
 }
@@ -81,17 +82,17 @@ data class CaptureAssetRequest(
     @field:NotNull val liquidity: Liquidity,
     @field:Valid @field:NotNull val money: MoneyRequest,
     @field:NotNull val effectiveAt: Instant,
-    @field:NotBlank val source: String,
+    @field:NotBlank @field:Size(max = 100) val source: String,
 ) {
-    fun toCommand(baseCurrency: Currency): CaptureAsset =
+    fun toCommand(baseCurrency: Currency, index: Int): CaptureAsset =
         CaptureAsset(
             id = id?.let(::AssetId),
             name = name,
             type = type,
             liquidity = liquidity,
-            money = money.toDomain(baseCurrency),
+            money = money.toDomain(baseCurrency, "assets[$index].money"),
             effectiveAt = effectiveAt,
-            source = ValuationSource.of(source),
+            source = validated("assets[$index].source", "must contain at most 100 characters") { ValuationSource.of(source) },
         )
 }
 
@@ -100,20 +101,33 @@ data class CaptureLiabilityRequest(
     @field:NotBlank val name: String,
     @field:Valid @field:NotNull val money: MoneyRequest,
     @field:NotNull val effectiveAt: Instant,
-    @field:NotBlank val source: String,
+    @field:NotBlank @field:Size(max = 100) val source: String,
 ) {
-    fun toCommand(baseCurrency: Currency): CaptureLiability =
+    fun toCommand(baseCurrency: Currency, index: Int): CaptureLiability =
         CaptureLiability(
             id = id?.let(::LiabilityId),
             name = name,
-            money = money.toDomain(baseCurrency),
+            money = money.toDomain(baseCurrency, "liabilities[$index].money"),
             effectiveAt = effectiveAt,
-            source = LiabilitySource.of(source),
+            source = validated("liabilities[$index].source", "must contain at most 100 characters") { LiabilitySource.of(source) },
         )
 }
 
-private fun MoneyRequest.toDomain(baseCurrency: Currency): Money {
-    require(currency == baseCurrency.code) { "Money currency must match the base currency" }
-    require(amount.matches(Regex("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))) { "Money amount must be a decimal string" }
-    return Money.of(amount.toBigDecimal(), baseCurrency)
+private fun MoneyRequest.toDomain(baseCurrency: Currency, field: String): Money {
+    if (currency != baseCurrency.code) throw RequestValidationException("$field.currency", "must match baseCurrency")
+    if (!amount.matches(Regex("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))) {
+        throw RequestValidationException("$field.amount", "must be a decimal string")
+    }
+    return validated("$field.amount", "must use the currency's supported precision") {
+        Money.of(amount.toBigDecimal(), baseCurrency)
+    }
 }
+
+private inline fun <T> validated(field: String, message: String, block: () -> T): T =
+    try {
+        block()
+    } catch (_: IllegalArgumentException) {
+        throw RequestValidationException(field, message)
+    } catch (_: ArithmeticException) {
+        throw RequestValidationException(field, message)
+    }
