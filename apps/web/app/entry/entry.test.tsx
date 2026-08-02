@@ -48,8 +48,18 @@ describe("Balance-sheet entry", () => {
     render(<EntryPage />);
 
     const prompt = await screen.findByLabelText("AI Prompt") as HTMLTextAreaElement;
-    expect(prompt.value).not.toContain("Cash");
+    expect(prompt.value).not.toContain(assetId);
+    expect(prompt.value).not.toContain("Bank statement");
     expect(prompt.value).not.toContain('"baseCurrency": "USD"');
+    expect(prompt.value).toContain("Ask one concise question at a time and wait for the user's answer");
+    expect(prompt.value).toContain("Cash and bank accounts");
+    expect(prompt.value).toContain("Investments and retirement accounts");
+    expect(prompt.value).toContain("Real estate");
+    expect(prompt.value).toContain("Vehicles");
+    expect(prompt.value).toContain("Business ownership");
+    expect(prompt.value).toContain("Other assets");
+    expect(prompt.value).toContain("Mortgages, credit cards, personal or business loans, taxes owed, and other liabilities");
+    expect(prompt.value).toContain("Do not return the final JSON until the user confirms the inventory is complete");
     fireEvent.click(screen.getByLabelText("Include current draft in Prompt"));
     expect(prompt.value).toContain(assetId);
     expect(screen.getByText("This Prompt contains sensitive financial data.")).toBeTruthy();

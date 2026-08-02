@@ -329,12 +329,20 @@ function buildPrompt(includeDraft: boolean, snapshotDate: string, baseCurrency: 
     liabilities: [{ name: "Example liability", amount: "250.00", effectiveDate: snapshotDate, source: "Statement description" }],
   };
   const instructions = [
-    "Return only valid JSON matching this schema. Do not add Markdown or explanations.",
+    "You are conducting a complete personal balance-sheet inventory interview. Do not assume the user's first answer is the full inventory.",
+    "Ask one concise question at a time and wait for the user's answer before continuing.",
+    "First confirm the base currency and Snapshot date. Then explicitly cover every asset category: Cash and bank accounts; Investments and retirement accounts; Real estate; Vehicles; Business ownership; and Other assets such as valuables or receivables. Ask about every category even when the user has not mentioned it.",
+    "Explicitly cover Mortgages, credit cards, personal or business loans, taxes owed, and other liabilities. Ask whether jointly held, foreign-currency, or easily forgotten positions remain.",
+    "For every asset, collect name, amount, effective date, source, type, and liquidity. For every liability, collect name, amount, effective date, and source. Ask follow-up questions whenever a required value is missing.",
+    "Use type CASH, INVESTMENT, REAL_ESTATE, VEHICLE, BUSINESS, or OTHER. Use liquidity LIQUID, SEMI_LIQUID, or ILLIQUID based on how readily the asset can be converted to cash.",
+    "Summarize the inventory and ask the user to confirm that it is complete. Do not return the final JSON until the user confirms the inventory is complete.",
+    "After confirmation, return only valid JSON matching this schema. Do not add Markdown or explanations to the final response.",
     "schemaVersion must be 1. Preserve every provided id exactly; omit id for new positions and never invent one.",
     "Amounts must be non-negative decimal strings. Dates must be YYYY-MM-DD. Do not add unknown fields or archive instructions.",
     `FORMAT EXAMPLE:\n${JSON.stringify(shape, null, 2)}`,
   ];
   if (includeDraft) {
+    instructions.push("Treat CURRENT_DRAFT as the starting inventory. Verify every existing position, preserve each provided id exactly, and continue interviewing for missing positions.");
     instructions.push(`CURRENT_DRAFT:\n${JSON.stringify({ schemaVersion: 1, baseCurrency, snapshotDate, assets: assets.map(({ id, name, type, liquidity, amount, effectiveDate, source }) => ({ ...(id ? { id } : {}), name, type, liquidity, amount, effectiveDate, source })), liabilities: liabilities.map(({ id, name, amount, effectiveDate, source }) => ({ ...(id ? { id } : {}), name, amount, effectiveDate, source })) }, null, 2)}`);
   }
   return instructions.join("\n\n");
