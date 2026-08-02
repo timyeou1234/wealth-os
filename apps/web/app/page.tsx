@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import "./styles.css";
 
 type Snapshot = { id: string; asOf: string };
 type Money = { amount: string; currency: string };
