@@ -50,4 +50,27 @@ class SnapshotControllerTest {
                 jsonPath("$.liabilities.length()") { value(0) }
             }
     }
+
+    @Test
+    fun `lists effective snapshots in chronological order`() {
+        createSnapshot("2026-07-01T00:00:00Z")
+        createSnapshot("2026-08-01T00:00:00Z")
+
+        mockMvc.get("/api/v1/snapshots")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(2) }
+                jsonPath("$[0].asOf") { value("2026-07-01T00:00:00Z") }
+                jsonPath("$[1].asOf") { value("2026-08-01T00:00:00Z") }
+            }
+    }
+
+    private fun createSnapshot(asOf: String) {
+        mockMvc.post("/api/v1/snapshots") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"asOf":"$asOf","recordedAt":"$asOf","assets":[],"liabilities":[]}"""
+        }.andExpect {
+            status { isCreated() }
+        }
+    }
 }
