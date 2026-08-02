@@ -4,6 +4,55 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:8080' | (string & {});
 };
 
+export type UpdateLiabilityRequest = {
+    name: string;
+};
+
+export type LiabilityResponse = {
+    id?: string;
+    name?: string;
+    archived?: boolean;
+};
+
+export type FieldValidationError = {
+    field?: string;
+    message?: string;
+};
+
+export type ValidationProblemResponse = {
+    type?: string;
+    title?: string;
+    status?: number;
+    detail?: string;
+    instance?: string;
+    errors?: Array<FieldValidationError>;
+};
+
+export type ProblemDetail = {
+    type?: string;
+    title?: string;
+    status?: number;
+    detail?: string;
+    instance?: string;
+    properties?: {
+        [key: string]: unknown;
+    };
+};
+
+export type UpdateAssetRequest = {
+    name: string;
+    type?: 'CASH' | 'INVESTMENT' | 'REAL_ESTATE' | 'VEHICLE' | 'BUSINESS' | 'OTHER';
+    liquidity?: 'LIQUID' | 'SEMI_LIQUID' | 'ILLIQUID';
+};
+
+export type AssetResponse = {
+    id?: string;
+    name?: string;
+    type?: string;
+    liquidity?: string;
+    archived?: boolean;
+};
+
 export type AssetFactRequest = {
     id?: string;
     name: string;
@@ -69,47 +118,10 @@ export type CreateLiabilityRequest = {
     name: string;
 };
 
-export type LiabilityResponse = {
-    id?: string;
-    name?: string;
-};
-
-export type FieldValidationError = {
-    field?: string;
-    message?: string;
-};
-
-export type ValidationProblemResponse = {
-    type?: string;
-    title?: string;
-    status?: number;
-    detail?: string;
-    instance?: string;
-    errors?: Array<FieldValidationError>;
-};
-
 export type CreateAssetRequest = {
     name: string;
     type?: 'CASH' | 'INVESTMENT' | 'REAL_ESTATE' | 'VEHICLE' | 'BUSINESS' | 'OTHER';
     liquidity?: 'LIQUID' | 'SEMI_LIQUID' | 'ILLIQUID';
-};
-
-export type AssetResponse = {
-    id?: string;
-    name?: string;
-    type?: string;
-    liquidity?: string;
-};
-
-export type ProblemDetail = {
-    type?: string;
-    title?: string;
-    status?: number;
-    detail?: string;
-    instance?: string;
-    properties?: {
-        [key: string]: unknown;
-    };
 };
 
 export type FinancialHealthContributor = {
@@ -137,139 +149,7 @@ export type FinancialHealthResponse = {
     explanations?: FinancialHealthExplanations;
 };
 
-export type ListData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/snapshots';
-};
-
-export type ListResponses = {
-    /**
-     * OK
-     */
-    200: Array<SnapshotResponse>;
-};
-
-export type ListResponse = ListResponses[keyof ListResponses];
-
-export type CreateData = {
-    body: CreateSnapshotRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/snapshots';
-};
-
-export type CreateResponses = {
-    /**
-     * OK
-     */
-    200: SnapshotResponse;
-};
-
-export type CreateResponse = CreateResponses[keyof CreateResponses];
-
-export type List1Data = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/liabilities';
-};
-
-export type List1Responses = {
-    /**
-     * OK
-     */
-    200: Array<LiabilityResponse>;
-};
-
-export type List1Response = List1Responses[keyof List1Responses];
-
-export type Create1Data = {
-    body: CreateLiabilityRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/liabilities';
-};
-
-export type Create1Errors = {
-    /**
-     * Request validation failed
-     */
-    400: ValidationProblemResponse;
-};
-
-export type Create1Error = Create1Errors[keyof Create1Errors];
-
-export type Create1Responses = {
-    /**
-     * Liability created
-     */
-    201: LiabilityResponse;
-};
-
-export type Create1Response = Create1Responses[keyof Create1Responses];
-
-export type List2Data = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/assets';
-};
-
-export type List2Responses = {
-    /**
-     * OK
-     */
-    200: Array<AssetResponse>;
-};
-
-export type List2Response = List2Responses[keyof List2Responses];
-
-export type Create2Data = {
-    body: CreateAssetRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/assets';
-};
-
-export type Create2Errors = {
-    /**
-     * Request validation failed
-     */
-    400: ValidationProblemResponse;
-};
-
-export type Create2Error = Create2Errors[keyof Create2Errors];
-
-export type Create2Responses = {
-    /**
-     * Asset created
-     */
-    201: AssetResponse;
-};
-
-export type Create2Response = Create2Responses[keyof Create2Responses];
-
-export type GetData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/v1/snapshots/{id}';
-};
-
-export type GetResponses = {
-    /**
-     * OK
-     */
-    200: SnapshotResponse;
-};
-
-export type GetResponse = GetResponses[keyof GetResponses];
-
-export type Get1Data = {
+export type GetLiabilityData = {
     body?: never;
     path: {
         id: string;
@@ -278,43 +158,56 @@ export type Get1Data = {
     url: '/api/v1/liabilities/{id}';
 };
 
-export type Get1Errors = {
+export type GetLiabilityErrors = {
     /**
      * Liability not found
      */
     404: ProblemDetail;
 };
 
-export type Get1Error = Get1Errors[keyof Get1Errors];
+export type GetLiabilityError = GetLiabilityErrors[keyof GetLiabilityErrors];
 
-export type Get1Responses = {
+export type GetLiabilityResponses = {
     /**
      * Liability found
      */
     200: LiabilityResponse;
 };
 
-export type Get1Response = Get1Responses[keyof Get1Responses];
+export type GetLiabilityResponse = GetLiabilityResponses[keyof GetLiabilityResponses];
 
-export type Get2Data = {
-    body?: never;
+export type UpdateLiabilityData = {
+    body: UpdateLiabilityRequest;
     path: {
-        snapshotId: string;
+        id: string;
     };
     query?: never;
-    url: '/api/v1/financial-health/{snapshotId}';
+    url: '/api/v1/liabilities/{id}';
 };
 
-export type Get2Responses = {
+export type UpdateLiabilityErrors = {
     /**
-     * OK
+     * Request validation failed
      */
-    200: FinancialHealthResponse;
+    400: ValidationProblemResponse;
+    /**
+     * Liability not found
+     */
+    404: ProblemDetail;
 };
 
-export type Get2Response = Get2Responses[keyof Get2Responses];
+export type UpdateLiabilityError = UpdateLiabilityErrors[keyof UpdateLiabilityErrors];
 
-export type Get3Data = {
+export type UpdateLiabilityResponses = {
+    /**
+     * Liability updated
+     */
+    200: LiabilityResponse;
+};
+
+export type UpdateLiabilityResponse = UpdateLiabilityResponses[keyof UpdateLiabilityResponses];
+
+export type GetAssetData = {
     body?: never;
     path: {
         id: string;
@@ -323,20 +216,255 @@ export type Get3Data = {
     url: '/api/v1/assets/{id}';
 };
 
-export type Get3Errors = {
+export type GetAssetErrors = {
     /**
      * Asset not found
      */
     404: ProblemDetail;
 };
 
-export type Get3Error = Get3Errors[keyof Get3Errors];
+export type GetAssetError = GetAssetErrors[keyof GetAssetErrors];
 
-export type Get3Responses = {
+export type GetAssetResponses = {
     /**
      * Asset found
      */
     200: AssetResponse;
 };
 
-export type Get3Response = Get3Responses[keyof Get3Responses];
+export type GetAssetResponse = GetAssetResponses[keyof GetAssetResponses];
+
+export type UpdateAssetData = {
+    body: UpdateAssetRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/assets/{id}';
+};
+
+export type UpdateAssetErrors = {
+    /**
+     * Request validation failed
+     */
+    400: ValidationProblemResponse;
+    /**
+     * Asset not found
+     */
+    404: ProblemDetail;
+};
+
+export type UpdateAssetError = UpdateAssetErrors[keyof UpdateAssetErrors];
+
+export type UpdateAssetResponses = {
+    /**
+     * Asset updated
+     */
+    200: AssetResponse;
+};
+
+export type UpdateAssetResponse = UpdateAssetResponses[keyof UpdateAssetResponses];
+
+export type ListSnapshotsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/snapshots';
+};
+
+export type ListSnapshotsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SnapshotResponse>;
+};
+
+export type ListSnapshotsResponse = ListSnapshotsResponses[keyof ListSnapshotsResponses];
+
+export type CreateSnapshotData = {
+    body: CreateSnapshotRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/snapshots';
+};
+
+export type CreateSnapshotResponses = {
+    /**
+     * OK
+     */
+    200: SnapshotResponse;
+};
+
+export type CreateSnapshotResponse = CreateSnapshotResponses[keyof CreateSnapshotResponses];
+
+export type ListLiabilitiesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/liabilities';
+};
+
+export type ListLiabilitiesResponses = {
+    /**
+     * OK
+     */
+    200: Array<LiabilityResponse>;
+};
+
+export type ListLiabilitiesResponse = ListLiabilitiesResponses[keyof ListLiabilitiesResponses];
+
+export type CreateLiabilityData = {
+    body: CreateLiabilityRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/liabilities';
+};
+
+export type CreateLiabilityErrors = {
+    /**
+     * Request validation failed
+     */
+    400: ValidationProblemResponse;
+};
+
+export type CreateLiabilityError = CreateLiabilityErrors[keyof CreateLiabilityErrors];
+
+export type CreateLiabilityResponses = {
+    /**
+     * Liability created
+     */
+    201: LiabilityResponse;
+};
+
+export type CreateLiabilityResponse = CreateLiabilityResponses[keyof CreateLiabilityResponses];
+
+export type ArchiveLiabilityData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/liabilities/{id}/archive';
+};
+
+export type ArchiveLiabilityErrors = {
+    /**
+     * Liability not found
+     */
+    404: ProblemDetail;
+};
+
+export type ArchiveLiabilityError = ArchiveLiabilityErrors[keyof ArchiveLiabilityErrors];
+
+export type ArchiveLiabilityResponses = {
+    /**
+     * Liability archived
+     */
+    204: void;
+};
+
+export type ArchiveLiabilityResponse = ArchiveLiabilityResponses[keyof ArchiveLiabilityResponses];
+
+export type ListAssetsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/assets';
+};
+
+export type ListAssetsResponses = {
+    /**
+     * OK
+     */
+    200: Array<AssetResponse>;
+};
+
+export type ListAssetsResponse = ListAssetsResponses[keyof ListAssetsResponses];
+
+export type CreateAssetData = {
+    body: CreateAssetRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/assets';
+};
+
+export type CreateAssetErrors = {
+    /**
+     * Request validation failed
+     */
+    400: ValidationProblemResponse;
+};
+
+export type CreateAssetError = CreateAssetErrors[keyof CreateAssetErrors];
+
+export type CreateAssetResponses = {
+    /**
+     * Asset created
+     */
+    201: AssetResponse;
+};
+
+export type CreateAssetResponse = CreateAssetResponses[keyof CreateAssetResponses];
+
+export type ArchiveAssetData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/assets/{id}/archive';
+};
+
+export type ArchiveAssetErrors = {
+    /**
+     * Asset not found
+     */
+    404: ProblemDetail;
+};
+
+export type ArchiveAssetError = ArchiveAssetErrors[keyof ArchiveAssetErrors];
+
+export type ArchiveAssetResponses = {
+    /**
+     * Asset archived
+     */
+    204: void;
+};
+
+export type ArchiveAssetResponse = ArchiveAssetResponses[keyof ArchiveAssetResponses];
+
+export type GetSnapshotData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/snapshots/{id}';
+};
+
+export type GetSnapshotResponses = {
+    /**
+     * OK
+     */
+    200: SnapshotResponse;
+};
+
+export type GetSnapshotResponse = GetSnapshotResponses[keyof GetSnapshotResponses];
+
+export type GetFinancialHealthData = {
+    body?: never;
+    path: {
+        snapshotId: string;
+    };
+    query?: never;
+    url: '/api/v1/financial-health/{snapshotId}';
+};
+
+export type GetFinancialHealthResponses = {
+    /**
+     * OK
+     */
+    200: FinancialHealthResponse;
+};
+
+export type GetFinancialHealthResponse = GetFinancialHealthResponses[keyof GetFinancialHealthResponses];

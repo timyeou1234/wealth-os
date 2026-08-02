@@ -39,11 +39,11 @@ class LiabilityController(
     private val archiveLiability: ArchiveLiability,
 ) {
     @GetMapping
-    @Operation(summary = "List liabilities")
+    @Operation(summary = "List liabilities", operationId = "listLiabilities")
     fun list(): List<LiabilityResponse> = listLiabilities.execute().map(LiabilityResponse::from)
 
     @PostMapping
-    @Operation(summary = "Create a liability")
+    @Operation(summary = "Create a liability", operationId = "createLiability")
     @ApiResponses(
         value = [
             ApiResponse(
@@ -72,7 +72,7 @@ class LiabilityController(
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a liability")
+    @Operation(summary = "Get a liability", operationId = "getLiability")
     @ApiResponses(
         value = [
             ApiResponse(
@@ -92,10 +92,10 @@ class LiabilityController(
     ): LiabilityResponse = LiabilityResponse.from(getLiability.execute(LiabilityId(id)))
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update a liability")
+    @Operation(summary = "Update a liability", operationId = "updateLiability")
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Liability updated"),
+            ApiResponse(responseCode = "200", description = "Liability updated", content = [Content(mediaType = "application/json", schema = Schema(implementation = LiabilityResponse::class))]),
             ApiResponse(responseCode = "400", description = "Request validation failed", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ValidationProblemResponse::class))]),
             ApiResponse(responseCode = "404", description = "Liability not found", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ProblemDetail::class))]),
         ],
@@ -106,7 +106,7 @@ class LiabilityController(
     ): LiabilityResponse = LiabilityResponse.from(updateLiability.execute(LiabilityId(id), request.name))
 
     @PostMapping("/{id}/archive")
-    @Operation(summary = "Archive a liability")
+    @Operation(summary = "Archive a liability", operationId = "archiveLiability")
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "204", description = "Liability archived"),

@@ -9,6 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.springframework.transaction.annotation.Transactional
 
 @SpringBootTest(
@@ -65,6 +66,45 @@ class SnapshotControllerTest {
             }
     }
 
+    @Test
+    fun `current position lifecycle does not rewrite a saved snapshot`() {
+        val asset = createResource("/api/v1/assets", """{"name":"Original Cash","type":"CASH","liquidity":"LIQUID"}""")
+        val liability = createResource("/api/v1/liabilities", """{"name":"Original Loan"}""")
+        val snapshot =
+            mockMvc.post("/api/v1/snapshots") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "asOf":"2026-08-01T00:00:00Z",
+                      "recordedAt":"2026-08-01T00:00:00Z",
+                      "assets":[{"id":"${asset.substringAfterLast('/')}","name":"Original Cash","type":"CASH","liquidity":"LIQUID","money":{"amount":"1000.00","currency":"USD"},"effectiveAt":"2026-08-01T00:00:00Z","source":"Bank statement"}],
+                      "liabilities":[{"id":"${liability.substringAfterLast('/')}","name":"Original Loan","money":{"amount":"250.00","currency":"USD"},"effectiveAt":"2026-08-01T00:00:00Z","source":"Lender statement"}]
+                    }
+                    """.trimIndent()
+            }.andReturn().response.getHeader("Location")!!
+
+        mockMvc.put(asset) {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"Renamed Fund","type":"INVESTMENT","liquidity":"SEMI_LIQUID"}"""
+        }.andExpect { status { isOk() } }
+        mockMvc.post("$asset/archive").andExpect { status { isNoContent() } }
+        mockMvc.put(liability) {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"Renamed Loan"}"""
+        }.andExpect { status { isOk() } }
+        mockMvc.post("$liability/archive").andExpect { status { isNoContent() } }
+
+        mockMvc.get(snapshot)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.assets[0].name") { value("Original Cash") }
+                jsonPath("$.assets[0].type") { value("CASH") }
+                jsonPath("$.assets[0].liquidity") { value("LIQUID") }
+                jsonPath("$.liabilities[0].name") { value("Original Loan") }
+            }
+    }
+
     private fun createSnapshot(asOf: String) {
         mockMvc.post("/api/v1/snapshots") {
             contentType = MediaType.APPLICATION_JSON
@@ -73,4 +113,16 @@ class SnapshotControllerTest {
             status { isCreated() }
         }
     }
+
+    private fun createResource(
+        path: String,
+        body: String,
+    ): String =
+        requireNotNull(
+            mockMvc.post(path) {
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.getHeader("Location"),
+        )
 }

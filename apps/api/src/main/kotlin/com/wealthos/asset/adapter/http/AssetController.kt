@@ -41,11 +41,11 @@ class AssetController(
     private val archiveAsset: ArchiveAsset,
 ) {
     @GetMapping
-    @Operation(summary = "List assets")
+    @Operation(summary = "List assets", operationId = "listAssets")
     fun list(): List<AssetResponse> = listAssets.execute().map(AssetResponse::from)
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get an asset")
+    @Operation(summary = "Get an asset", operationId = "getAsset")
     @ApiResponses(
         value = [
             ApiResponse(
@@ -65,7 +65,7 @@ class AssetController(
     ): AssetResponse = AssetResponse.from(getAsset.execute(AssetId(id)))
 
     @PostMapping
-    @Operation(summary = "Create an asset")
+    @Operation(summary = "Create an asset", operationId = "createAsset")
     @ApiResponses(
         value = [
             ApiResponse(
@@ -95,10 +95,10 @@ class AssetController(
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update an asset")
+    @Operation(summary = "Update an asset", operationId = "updateAsset")
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Asset updated"),
+            ApiResponse(responseCode = "200", description = "Asset updated", content = [Content(mediaType = "application/json", schema = Schema(implementation = AssetResponse::class))]),
             ApiResponse(responseCode = "400", description = "Request validation failed", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ValidationProblemResponse::class))]),
             ApiResponse(responseCode = "404", description = "Asset not found", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ProblemDetail::class))]),
         ],
@@ -112,7 +112,7 @@ class AssetController(
         )
 
     @PostMapping("/{id}/archive")
-    @Operation(summary = "Archive an asset")
+    @Operation(summary = "Archive an asset", operationId = "archiveAsset")
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "204", description = "Asset archived"),

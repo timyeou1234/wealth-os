@@ -23,7 +23,7 @@ class FinancialHealthController(
     private val getFinancialHealth: GetFinancialHealth,
 ) {
     @GetMapping("/{snapshotId}")
-    @Operation(summary = "Get financial health for a snapshot")
+    @Operation(summary = "Get financial health for a snapshot", operationId = "getFinancialHealth")
     fun get(
         @PathVariable snapshotId: UUID,
     ): FinancialHealthResponse = FinancialHealthResponse.from(getFinancialHealth.execute(SnapshotId(snapshotId)))
