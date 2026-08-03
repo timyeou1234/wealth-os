@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import React, { FormEvent, useEffect, useRef, useState } from "react";
+import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
-import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse } from "../api/client";
+import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
 import { AppNavigation } from "../app-navigation";
 import { parseAgentImport } from "./import";
 import type { AgentImport } from "./import";
@@ -53,6 +53,7 @@ export default function EntryPage() {
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<EntryStep>("settings");
   const [validationFocusRequest, setValidationFocusRequest] = useState(0);
+  const [apiFocus, setApiFocus] = useState<{ field: string; request: number }>();
   const [showValidation, setShowValidation] = useState(false);
   const [error, setError] = useState<string>();
   const [snapshotDate, setSnapshotDate] = useState(today);
@@ -90,6 +91,15 @@ export default function EntryPage() {
     if (validationFocusRequest > 0) formRef.current?.querySelector<HTMLElement>(".entry-step-panel :invalid")?.focus();
   }, [validationFocusRequest]);
 
+  useEffect(() => {
+    if (!apiFocus) return;
+    const candidates = Array.from(formRef.current?.querySelectorAll<HTMLElement>("[data-api-field]") ?? []);
+    const exact = candidates.find((element) => element.dataset.apiField === apiFocus.field);
+    const collection = apiFocus.field.match(/^(assets|liabilities)\[(\d+)]/);
+    const fallbackField = collection ? `${collection[1]}[${collection[2]}].name` : apiFocus.field === "recordedAt" ? "asOf" : undefined;
+    (exact ?? candidates.find((element) => element.dataset.apiField === fallbackField) ?? formRef.current?.querySelector<HTMLElement>(".entry-step-panel h2"))?.focus();
+  }, [apiFocus]);
+
   const addAsset = () => {
     const key = `new-asset-${nextKey.current++}`;
     setAssets((items) => [...items, { key, name: "", type: "", liquidity: "", amount: "", effectiveDate: snapshotDate, source: "" }]);
@@ -125,6 +135,8 @@ export default function EntryPage() {
         new Set(liabilities.flatMap((item) => item.id ? [item.id] : [])),
       );
       const changes = [
+        ...(data.baseCurrency !== baseCurrency ? [`Change base currency: ${baseCurrency || "Not set"} → ${data.baseCurrency}`] : []),
+        ...(data.snapshotDate && data.snapshotDate !== snapshotDate ? [`Change Snapshot date: ${displayDate(snapshotDate)} → ${displayDate(data.snapshotDate)}`] : []),
         ...data.assets.map((item) => item.id ? `Update asset: ${assets.find((asset) => asset.id === item.id)?.name} → ${item.name}` : `Add asset: ${item.name}`),
         ...data.liabilities.map((item) => item.id ? `Update liability: ${liabilities.find((liability) => liability.id === item.id)?.name} → ${item.name}` : `Add liability: ${item.name}`),
       ];
@@ -186,6 +198,20 @@ export default function EntryPage() {
     setSaving(true);
     try {
       const response = await captureSnapshot({ body });
+      if (response.error) {
+        const validation = response.error as ValidationProblemResponse;
+        const validationErrors = validation.errors?.filter((item) => item.field) ?? [];
+        const first = validationErrors[0];
+        const firstField = first?.field;
+        if (firstField) {
+          setError(validationErrors.map(formatApiError).join(" "));
+          setStep(stepForApiField(firstField));
+          setApiFocus((current) => ({ field: firstField, request: (current?.request ?? 0) + 1 }));
+          setSaving(false);
+          return;
+        }
+        throw new Error("Snapshot request failed");
+      }
       if (!response.data?.id) throw new Error("Snapshot response did not include an ID");
       router.push(`/?snapshot=${response.data.id}`);
     } catch {
@@ -208,10 +234,10 @@ export default function EntryPage() {
         />
 
         {step === "settings" && <section className="entry-step-panel" aria-labelledby="settings-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 1 of 4</p><h2 id="settings-step-title">Settings</h2><p>Set the Snapshot context or accelerate entry with your own AI agent.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 1 of 4</p><h2 id="settings-step-title" tabIndex={-1}>Settings</h2><p>Set the Snapshot context or accelerate entry with your own AI agent.</p></div>
           <section className="entry-settings" aria-label="Snapshot settings">
-            <label>Snapshot date<input aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-            <label>Base currency<input aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
+            <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
+            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
           </section>
 
           <section className="ai-import" aria-labelledby="ai-import-title">
@@ -229,23 +255,23 @@ export default function EntryPage() {
         </section>}
 
         {step === "assets" && <section className="entry-step-panel" aria-labelledby="assets-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 2 of 4</p><h2 id="assets-step-title">Assets</h2><p>Review every active asset and its value for this Snapshot.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 2 of 4</p><h2 id="assets-step-title" tabIndex={-1}>Assets</h2><p>Review every active asset and its value for this Snapshot.</p></div>
           <EntrySection title="Assets" onAdd={addAsset} addLabel="Add asset">
-            {assets.map((asset, index) => <AssetFields key={asset.key} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
+            {assets.map((asset, index) => <AssetFields key={asset.key} index={index} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
           </EntrySection>
           <StepActions previous="settings" next="liabilities" onChange={setStep} />
         </section>}
 
         {step === "liabilities" && <section className="entry-step-panel" aria-labelledby="liabilities-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 3 of 4</p><h2 id="liabilities-step-title">Liabilities</h2><p>Review every active liability and its balance for this Snapshot.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 3 of 4</p><h2 id="liabilities-step-title" tabIndex={-1}>Liabilities</h2><p>Review every active liability and its balance for this Snapshot.</p></div>
           <EntrySection title="Liabilities" onAdd={addLiability} addLabel="Add liability">
-            {liabilities.map((liability, index) => <LiabilityFields key={liability.key} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
+            {liabilities.map((liability, index) => <LiabilityFields key={liability.key} index={index} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
           </EntrySection>
           <StepActions previous="assets" next="review" onChange={setStep} />
         </section>}
 
         {step === "review" && <section className="entry-step-panel review-step" aria-labelledby="review-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 4 of 4</p><h2 id="review-step-title">Review and save</h2><p>Confirm the complete balance sheet before creating the immutable Snapshot.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 4 of 4</p><h2 id="review-step-title" tabIndex={-1}>Review and save</h2><p>Confirm the complete balance sheet before creating the immutable Snapshot.</p></div>
           <dl className="review-summary">
             <div><dt>Snapshot date</dt><dd>{snapshotDate || "Missing"}</dd></div>
             <div><dt>Base currency</dt><dd>{baseCurrency || "Missing"}</dd></div>
@@ -256,17 +282,17 @@ export default function EntryPage() {
           <div className="step-actions"><button type="button" onClick={() => setStep("liabilities")}>Back</button><button className="primary-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Snapshot"}</button></div>
         </section>}
 
-        {archiveTarget && <section className="confirm-dialog" role="dialog" aria-modal="true" aria-label={`Archive ${archiveTarget.name}?`}>
+        {archiveTarget && <ModalDialog label={`Archive ${archiveTarget.name}?`} onDismiss={() => setArchiveTarget(undefined)}>
           <h2>Archive {archiveTarget.name}?</h2>
           <p>It will leave the current entry list. Saved Snapshots will not change.</p>
-          <div><button type="button" onClick={() => setArchiveTarget(undefined)}>Cancel</button><button type="button" className="danger-action" autoFocus onClick={confirmArchive}>Confirm archive</button></div>
-        </section>}
-        {importReview && <section className="confirm-dialog" role="dialog" aria-modal="true" aria-label="Review AI import">
+          <div><button type="button" onClick={() => setArchiveTarget(undefined)}>Cancel</button><button type="button" className="danger-action" onClick={confirmArchive}>Confirm archive</button></div>
+        </ModalDialog>}
+        {importReview && <ModalDialog label="Review AI import" onDismiss={() => setImportReview(undefined)}>
           <h2>Review AI import</h2>
           {importReview.changes.length === 0 ? <p>No additions or changes were supplied.</p> : <ul>{importReview.changes.map((change) => <li key={change}>{change}</li>)}</ul>}
           <p>This changes only the current form. It does not call the API or archive omitted positions.</p>
-          <div><button type="button" onClick={() => setImportReview(undefined)}>Cancel</button><button type="button" autoFocus onClick={applyImport}>Apply import</button></div>
-        </section>}
+          <div><button type="button" onClick={() => setImportReview(undefined)}>Cancel</button><button type="button" onClick={applyImport}>Apply import</button></div>
+        </ModalDialog>}
         {error && <p className="form-error" role="alert">{error}</p>}
       </form>}
     </main>
@@ -297,7 +323,43 @@ function EntrySection({ title, onAdd, addLabel, children }: { title: string; onA
   return <section className="entry-section"><div className="section-heading"><h2>{title}</h2><button type="button" onClick={onAdd}>{addLabel}</button></div><div className="entry-list">{children}</div></section>;
 }
 
-function AssetFields({ draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { draft: AssetDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: AssetDraft) => void; onArchive?: () => void }) {
+function ModalDialog({ label, onDismiss, children }: { label: string; onDismiss: () => void; children: React.ReactNode }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const invokingElement = useRef<HTMLElement | null>(typeof document === "undefined" ? null : document.activeElement as HTMLElement | null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const first = dialog?.querySelector<HTMLElement>(focusableSelector);
+    first?.focus();
+    return () => invokingElement.current?.focus();
+  }, []);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onDismiss();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable.at(-1)!;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  return <section ref={dialogRef} className="confirm-dialog" role="dialog" aria-modal="true" aria-label={label} onKeyDown={handleKeyDown}>{children}</section>;
+}
+
+const focusableSelector = "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])";
+
+function AssetFields({ index, draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { index: number; draft: AssetDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: AssetDraft) => void; onArchive?: () => void }) {
   const label = isNew ? "New asset" : draft.name;
   const invalidName = showValidation && !draft.name.trim();
   const invalidType = showValidation && !draft.type;
@@ -306,28 +368,28 @@ function AssetFields({ draft, isNew, snapshotDate, showValidation, onChange, onA
   const invalidDate = showValidation && (!draft.effectiveDate || draft.effectiveDate > snapshotDate);
   const invalidSource = showValidation && !draft.source.trim();
   return <fieldset className="position-editor" aria-label={label}><legend>{label}</legend>
-    <label>Name<input aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
-    <label>Type<select aria-label={isNew ? "Type" : `${label} type`} aria-invalid={invalidType || undefined} value={draft.type} onChange={(event) => onChange({ ...draft, type: event.target.value as AssetType | "" })} required><option value="">Choose type</option>{assetTypes.map((value) => <option key={value}>{value}</option>)}</select>{invalidType && <span className="field-error">Type is required.</span>}</label>
-    <label>Liquidity<select aria-label={isNew ? "Liquidity" : `${label} liquidity`} aria-invalid={invalidLiquidity || undefined} value={draft.liquidity} onChange={(event) => onChange({ ...draft, liquidity: event.target.value as Liquidity | "" })} required><option value="">Choose liquidity</option>{liquidities.map((value) => <option key={value}>{value}</option>)}</select>{invalidLiquidity && <span className="field-error">Liquidity is required.</span>}</label>
-    <label>Amount<input aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
-    <label>Effective date<input aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
-    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
+    <label>Name<input data-api-field={`assets[${index}].name`} aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
+    <label>Type<select data-api-field={`assets[${index}].type`} aria-label={isNew ? "Type" : `${label} type`} aria-invalid={invalidType || undefined} value={draft.type} onChange={(event) => onChange({ ...draft, type: event.target.value as AssetType | "" })} required><option value="">Choose type</option>{assetTypes.map((value) => <option key={value}>{value}</option>)}</select>{invalidType && <span className="field-error">Type is required.</span>}</label>
+    <label>Liquidity<select data-api-field={`assets[${index}].liquidity`} aria-label={isNew ? "Liquidity" : `${label} liquidity`} aria-invalid={invalidLiquidity || undefined} value={draft.liquidity} onChange={(event) => onChange({ ...draft, liquidity: event.target.value as Liquidity | "" })} required><option value="">Choose liquidity</option>{liquidities.map((value) => <option key={value}>{value}</option>)}</select>{invalidLiquidity && <span className="field-error">Liquidity is required.</span>}</label>
+    <label>Amount<input data-api-field={`assets[${index}].money.amount`} aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Effective date<input data-api-field={`assets[${index}].effectiveAt`} aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
+    <label>Source<input data-api-field={`assets[${index}].source`} aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
     {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
     {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
   </fieldset>;
 }
 
-function LiabilityFields({ draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { draft: LiabilityDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: LiabilityDraft) => void; onArchive?: () => void }) {
+function LiabilityFields({ index, draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { index: number; draft: LiabilityDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: LiabilityDraft) => void; onArchive?: () => void }) {
   const label = isNew ? "New liability" : draft.name;
   const invalidName = showValidation && !draft.name.trim();
   const invalidAmount = showValidation && !decimal.test(draft.amount);
   const invalidDate = showValidation && (!draft.effectiveDate || draft.effectiveDate > snapshotDate);
   const invalidSource = showValidation && !draft.source.trim();
   return <fieldset className="position-editor" aria-label={label}><legend>{label}</legend>
-    <label>Name<input aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
-    <label>Amount<input aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
-    <label>Effective date<input aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
-    <label>Source<input aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
+    <label>Name<input data-api-field={`liabilities[${index}].name`} aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
+    <label>Amount<input data-api-field={`liabilities[${index}].money.amount`} aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Effective date<input data-api-field={`liabilities[${index}].effectiveAt`} aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
+    <label>Source<input data-api-field={`liabilities[${index}].source`} aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
     {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
     {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
   </fieldset>;
@@ -363,6 +425,31 @@ function validAssets(assets: AssetDraft[], snapshotDate: string): boolean {
 
 function validLiabilities(liabilities: LiabilityDraft[], snapshotDate: string): boolean {
   return liabilities.every((item) => Boolean(item.name.trim() && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim()));
+}
+
+function stepForApiField(field: string): EntryStep {
+  if (field.startsWith("assets")) return "assets";
+  if (field.startsWith("liabilities")) return "liabilities";
+  return "settings";
+}
+
+function formatApiError(error: { field?: string; message?: string }): string {
+  const field = error.field ?? "request";
+  const collection = field.match(/^(assets|liabilities)\[(\d+)](?:\.(.+))?$/);
+  const suffix = collection?.[3]
+    ?.replace("money.amount", "amount")
+    .replace("money.currency", "currency")
+    .replace("effectiveAt", "effective date")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase();
+  const label = collection
+    ? `${collection[1] === "assets" ? "Asset" : "Liability"} ${Number(collection[2]) + 1}${suffix ? ` ${suffix}` : ""}`
+    : field === "baseCurrency" ? "Base currency"
+      : field === "asOf" ? "Snapshot date"
+        : field === "recordedAt" ? "Recorded time"
+          : "Request";
+  const message = error.message ?? "is invalid";
+  return `${label} ${message}${/[.!?]$/.test(message) ? "" : "."}`;
 }
 
 function mergeAssets(current: AssetDraft[], imported: AgentImport, nextKey: { current: number }): AssetDraft[] {

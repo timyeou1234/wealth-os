@@ -59,6 +59,7 @@ describe("Balance-sheet entry", () => {
     expect(within(steps).getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("step");
     expect(screen.getByLabelText("Base currency")).toBeTruthy();
     expect(screen.queryByLabelText("Cash amount")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save Snapshot" })).toBeNull();
 
     fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     fireEvent.change(screen.getByLabelText("Cash name"), { target: { value: "Emergency reserve" } });
@@ -121,6 +122,50 @@ describe("Balance-sheet entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Liabilities" }));
     expect(screen.getByRole("group", { name: "New liability" })).toBeTruthy();
     expect(api.captureSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("previews snapshot setting changes before applying an agent import", async () => {
+    render(<EntryPage />);
+    await screen.findByLabelText("Agent JSON");
+
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
+      "schemaVersion": 1,
+      "baseCurrency": "EUR",
+      "snapshotDate": "2026-08-01",
+      "assets": [],
+      "liabilities": []
+    }` } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect(screen.getByText("Change base currency: USD → EUR")).toBeTruthy();
+    expect(screen.getByText("Change Snapshot date: Aug 2, 2026 → Aug 1, 2026")).toBeTruthy();
+    expect((screen.getByLabelText("Base currency") as HTMLInputElement).value).toBe("USD");
+  });
+
+  it("keeps keyboard focus inside dialogs and restores it when dismissed", async () => {
+    render(<EntryPage />);
+    await screen.findByLabelText("Agent JSON");
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
+      "schemaVersion": 1,
+      "baseCurrency": "USD",
+      "assets": [],
+      "liabilities": []
+    }` } });
+    const preview = screen.getByRole("button", { name: "Preview import" });
+    preview.focus();
+    fireEvent.click(preview);
+
+    const dialog = screen.getByRole("dialog", { name: "Review AI import" });
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    const apply = within(dialog).getByRole("button", { name: "Apply import" });
+    await waitFor(() => expect(document.activeElement).toBe(cancel));
+    apply.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(document.activeElement).toBe(cancel);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
+    expect(document.activeElement).toBe(preview);
   });
 
   it("accepts one unlabeled fenced JSON block", async () => {
@@ -214,6 +259,22 @@ describe("Balance-sheet entry", () => {
     fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     expect((screen.getByLabelText("Updated cash name") as HTMLInputElement).value).toBe("Updated cash");
     expect(api.captureSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("maps an API validation error back to its step and first affected field", async () => {
+    api.captureSnapshot.mockResolvedValue({ error: { errors: [{ field: "assets[0].money.amount", message: "must use the currency's supported precision" }] } });
+    render(<EntryPage />);
+
+    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
+    fireEvent.change(screen.getByLabelText("Cash name"), { target: { value: "Emergency cash" } });
+    fireEvent.click(within(steps).getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
+
+    expect(await screen.findByText("Asset 1 amount must use the currency's supported precision.")).toBeTruthy();
+    expect(within(steps).getByRole("button", { name: "Assets" }).getAttribute("aria-current")).toBe("step");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Emergency cash amount")));
+    expect((screen.getByLabelText("Emergency cash name") as HTMLInputElement).value).toBe("Emergency cash");
   });
 
   it("prefills the latest facts and captures all active positions with a new asset", async () => {
