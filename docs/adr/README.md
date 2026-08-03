@@ -17,3 +17,4 @@ ADRs are superseded by a new ADR rather than silently rewritten.
 - [ADR-005: Represent money as a currency-aware value object](0005-money-value-object.md)
 - [ADR-006: Record auditable snapshot corrections](0006-auditable-snapshot-corrections.md)
 - [ADR-007: Persist domain aggregates with JPA and Flyway](0007-persist-domain-aggregates-with-jpa-and-flyway.md)
+- [ADR-008: Use auditable historical FX conversion into TWD](0008-auditable-twd-fx-valuation.md)

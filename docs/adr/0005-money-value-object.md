@@ -1,6 +1,6 @@
 # ADR-005: Represent money as a currency-aware value object
 
-- **Status:** Accepted
+- **Status:** Accepted; foreign-conversion portion superseded by proposed ADR-008
 - **Date:** 2026-07-29
 - **Decision owners:** Wealth OS maintainers
 
@@ -12,6 +12,10 @@ decimal amounts exactly. A numeric field without an explicit currency also permi
 invalid arithmetic and hides foreign-exchange assumptions.
 
 ## Decision
+
+ADR-008 supersedes the statements below that defer automatic FX conversion and require
+all Snapshot callers to pre-convert facts. The exact `Money`, explicit currency, and
+rounding decisions in this ADR remain accepted.
 
 Represent monetary amounts as an immutable `Money` value object containing a
 `BigDecimal` amount and a validated ISO 4217 `Currency` value object.

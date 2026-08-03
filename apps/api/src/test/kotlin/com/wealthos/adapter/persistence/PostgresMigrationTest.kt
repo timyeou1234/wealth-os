@@ -35,6 +35,7 @@ class PostgresMigrationTest
                           'assets',
                           'liabilities',
                           'snapshots',
+                          'fx_rates',
                           'snapshot_asset_positions',
                           'snapshot_liability_positions'
                       )
@@ -46,6 +47,7 @@ class PostgresMigrationTest
             assertEquals(
                 listOf(
                     "assets",
+                    "fx_rates",
                     "liabilities",
                     "snapshot_asset_positions",
                     "snapshot_liability_positions",

@@ -47,10 +47,23 @@ browser from introducing binary rounding errors into financial values. `currency
 uppercase ISO 4217 currency code. Feature endpoints must not return a bare amount without
 its currency.
 
-Snapshot asset and liability facts may include `manualConversion` when their submitted
-value was manually converted to the selected base currency. It carries `originalMoney`,
-`exchangeRateBasis`, and `effectiveAt`; clients omit it for values already expressed in
-the base currency.
+The target Snapshot contract in Issue #66 (not implemented by the FX-rate infrastructure
+slice) uses `originalMoney` for the submitted fact and TWD
+`money` for canonical valuation. Foreign-currency facts include structured
+`appliedConversion` evidence: rate, rate date, provider, rate type, optional user basis,
+and rounding mode.
+
+## Foreign-exchange rates
+
+These endpoints are implemented by the first Issue #66 vertical slice.
+
+- `POST /api/v1/fx-rates/sync` synchronizes the fixed CBC provider through the configured
+  upstream adapter. Optional `from` and `to` dates form a bounded inclusive range.
+- `GET /api/v1/fx-rates?asOf=YYYY-MM-DD&currencies=USD,JPY` resolves the nearest rate on
+  or before `asOf` for each requested currency.
+- Rates are direct original-currency/TWD quotes: `1 originalCurrency = rate TWD`.
+- TWD resolves to the identity rate without persistence. Missing currencies are explicit;
+  no endpoint silently substitutes a different provider or future date.
 
 ## Validation and errors
 

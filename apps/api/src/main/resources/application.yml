@@ -13,3 +13,8 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+
+wealthos:
+  fx:
+    scheduling-enabled: ${WEALTHOS_FX_SCHEDULING_ENABLED:true}
+    frankfurter-base-url: ${WEALTHOS_FRANKFURTER_BASE_URL:https://api.frankfurter.dev}
