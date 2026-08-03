@@ -7,6 +7,10 @@ button { background: #22324e; border: 1px solid #415578; border-radius: 8px; col
 button:hover { border-color: #6ca5e8; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid #70aef6; outline-offset: 2px; }
 button:disabled { cursor: wait; opacity: .65; }
+.app-navigation { border-bottom: 1px solid #263551; display: flex; gap: 8px; margin-bottom: 32px; }
+.app-navigation a { border-bottom: 3px solid transparent; color: #aeb9ca; padding: 12px 16px; text-decoration: none; }
+.app-navigation a:hover { color: #e8edf5; }
+.app-navigation a[aria-current="page"] { border-bottom-color: #70aef6; color: #e8edf5; font-weight: 700; }
 .dashboard { max-width: 1100px; margin: 0 auto; padding: 56px 24px; }
 header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 40px; }
 h1 { margin: 0; font-size: 2.25rem; }
@@ -26,6 +30,15 @@ select { background: #182237; border: 1px solid #31415f; border-radius: 8px; col
 
 .entry-page { max-width: 1180px; margin: 0 auto; padding: 48px 24px 80px; }
 .entry-header { align-items: end; display: flex; justify-content: space-between; margin-bottom: 32px; }
+.entry-stepper { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.entry-stepper button { align-items: center; background: #151e30; border-color: #263551; color: #aeb9ca; display: flex; gap: 10px; text-align: left; }
+.entry-stepper button[aria-current="step"] { background: #1e3455; border-color: #70aef6; color: #edf2f9; }
+.entry-stepper button[data-complete="true"] .step-number { background: #2f7658; }
+.step-number { align-items: center; background: #263551; border-radius: 999px; color: #edf2f9; display: inline-flex; flex: 0 0 28px; height: 28px; justify-content: center; }
+.entry-step-panel { margin-top: 28px; }
+.step-heading { margin-bottom: 20px; }
+.step-heading h2 { margin: 0; }
+.step-heading > p:last-child { color: #aeb9ca; margin-bottom: 0; }
 .entry-settings { background: #151e30; border: 1px solid #263551; border-radius: 12px; display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 240px)); padding: 20px; }
 .entry-page label { color: #c2ccdb; display: grid; gap: 7px; }
 .entry-page input, .entry-page select, .entry-page textarea { background: #0f1829; border: 1px solid #3a4d6e; border-radius: 8px; color: #edf2f9; min-width: 0; padding: 10px 11px; }
@@ -40,6 +53,14 @@ select { background: #182237; border: 1px solid #31415f; border-radius: 8px; col
 .archive-action { justify-self: end; }
 .danger-action { background: #642d38; border-color: #a34e5d; }
 .primary-action { background: #2d65a3; border-color: #5898df; font-weight: 700; margin-top: 24px; min-width: 180px; }
+.step-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+.step-actions .primary-action { margin-top: 0; }
+.review-step { background: #151e30; border: 1px solid #263551; border-radius: 12px; padding: 24px; }
+.review-summary { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 24px 0; }
+.review-summary div { background: #0f1829; border: 1px solid #31415f; border-radius: 10px; padding: 16px; }
+.review-summary dt { color: #aeb9ca; font-size: .8rem; }
+.review-summary dd { font-size: 1.1rem; font-weight: 700; margin: 8px 0 0; }
+.review-warning { color: #ffcf89; }
 .ai-import { display: grid; gap: 14px; }
 .ai-import > p { margin: 0; }
 .checkbox-label { align-items: center; display: flex !important; gap: 10px !important; }
@@ -53,9 +74,11 @@ select { background: #182237; border: 1px solid #31415f; border-radius: 8px; col
 @media (max-width: 800px) {
   .dashboard-actions, .entry-header { align-items: start; flex-direction: column; }
   .position-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
   .entry-page { padding: 32px 16px 64px; }
+  .entry-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .entry-settings, .position-editor { grid-template-columns: 1fr; }
   .section-heading { align-items: stretch; flex-direction: column; gap: 12px; }
 }

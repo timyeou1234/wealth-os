@@ -19,6 +19,17 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Dashboard", () => {
+  it("shows Dashboard and Input as app-level navigation", async () => {
+    api.listSnapshots.mockResolvedValue({ data: [] });
+
+    render(<Dashboard />);
+
+    const navigation = screen.getByRole("navigation", { name: "Primary" });
+    expect(screen.getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Input" }).getAttribute("href")).toBe("/entry");
+    expect(navigation).toBeTruthy();
+  });
+
   it("opens the snapshot requested by the entry workflow", async () => {
     window.history.replaceState({}, "", "/?snapshot=older");
     api.listSnapshots.mockResolvedValue({ data: [{ id: "older", asOf: "2026-07-01T00:00:00Z" }, { id: "latest", asOf: "2026-08-01T00:00:00Z" }] });

@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
 import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse } from "../api/client";
+import { AppNavigation } from "../app-navigation";
 import { parseAgentImport } from "./import";
 import type { AgentImport } from "./import";
 
@@ -34,6 +34,7 @@ type LiabilityDraft = {
 };
 
 type ArchiveTarget = { kind: "asset" | "liability"; id: string; key: string; name: string };
+type EntryStep = "settings" | "assets" | "liabilities" | "review";
 
 const instant = (day: string) => new Date(`${day}T00:00:00Z`).toISOString();
 const day = (value?: string) => value?.slice(0, 10) ?? "";
@@ -47,8 +48,11 @@ const currencyCode = /^[A-Z]{3}$/;
 export default function EntryPage() {
   const router = useRouter();
   const nextKey = useRef(0);
+  const formRef = useRef<HTMLFormElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<EntryStep>("settings");
+  const [validationFocusRequest, setValidationFocusRequest] = useState(0);
   const [showValidation, setShowValidation] = useState(false);
   const [error, setError] = useState<string>();
   const [snapshotDate, setSnapshotDate] = useState(today);
@@ -81,6 +85,10 @@ export default function EntryPage() {
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (validationFocusRequest > 0) formRef.current?.querySelector<HTMLElement>(".entry-step-panel :invalid")?.focus();
+  }, [validationFocusRequest]);
 
   const addAsset = () => {
     const key = `new-asset-${nextKey.current++}`;
@@ -139,14 +147,19 @@ export default function EntryPage() {
   };
 
   const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
+  const settingsComplete = Boolean(snapshotDate && currencyCode.test(baseCurrency));
+  const assetsComplete = validAssets(assets, snapshotDate);
+  const liabilitiesComplete = validLiabilities(liabilities, snapshotDate);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(undefined);
-    if (!snapshotDate || !currencyCode.test(baseCurrency) || !valid(assets, liabilities, snapshotDate)) {
+    if (!settingsComplete || !assetsComplete || !liabilitiesComplete) {
+      const invalidStep: EntryStep = !settingsComplete ? "settings" : !assetsComplete ? "assets" : "liabilities";
       setShowValidation(true);
       setError("Complete every required field before saving the Snapshot.");
-      event.currentTarget.querySelector<HTMLElement>(":invalid")?.focus();
+      setStep(invalidStep);
+      setValidationFocusRequest((request) => request + 1);
       return;
     }
     const body: CaptureSnapshotRequest = {
@@ -183,35 +196,65 @@ export default function EntryPage() {
 
   return (
     <main className="entry-page">
+      <AppNavigation current="input" />
       <header className="entry-header">
         <div><p className="eyebrow">Balance-sheet entry</p><h1>Update balance sheet</h1></div>
-        <Link href="/">Back to Dashboard</Link>
       </header>
-      {loading ? <p>Loading current positions…</p> : <form onSubmit={submit} noValidate>
-        <section className="entry-settings" aria-label="Snapshot settings">
-          <label>Snapshot date<input aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-          <label>Base currency<input aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
-        </section>
+      {loading ? <p>Loading current positions…</p> : <form ref={formRef} onSubmit={submit} noValidate>
+        <EntryStepper
+          current={step}
+          completed={{ settings: settingsComplete, assets: assetsComplete, liabilities: liabilitiesComplete, review: settingsComplete && assetsComplete && liabilitiesComplete }}
+          onChange={setStep}
+        />
 
-        <section className="ai-import" aria-labelledby="ai-import-title">
-          <div><p className="eyebrow">Optional accelerator</p><h2 id="ai-import-title">AI-assisted import</h2></div>
-          <p>Copy the Prompt to your own AI agent, then paste its JSON response here. Nothing is sent automatically.</p>
-          <label className="checkbox-label"><input type="checkbox" checked={includeDraftInPrompt} onChange={(event) => setIncludeDraftInPrompt(event.target.checked)} />Include current draft in Prompt</label>
-          {includeDraftInPrompt && <p className="sensitive-warning">This Prompt contains sensitive financial data.</p>}
-          <label>AI Prompt<textarea aria-label="AI Prompt" value={prompt} readOnly rows={12} /></label>
-          <button type="button" onClick={() => navigator.clipboard?.writeText(prompt)}>Copy Prompt</button>
-          <label>Agent JSON<textarea aria-label="Agent JSON" value={agentJson} onChange={(event) => setAgentJson(event.target.value)} rows={12} placeholder="Paste raw JSON or one JSON code block" /></label>
-          {importError && <p className="form-error" role="alert">{importError}</p>}
-          <button type="button" onClick={previewImport}>Preview import</button>
-        </section>
+        {step === "settings" && <section className="entry-step-panel" aria-labelledby="settings-step-title">
+          <div className="step-heading"><p className="eyebrow">Step 1 of 4</p><h2 id="settings-step-title">Settings</h2><p>Set the Snapshot context or accelerate entry with your own AI agent.</p></div>
+          <section className="entry-settings" aria-label="Snapshot settings">
+            <label>Snapshot date<input aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
+            <label>Base currency<input aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
+          </section>
 
-        <EntrySection title="Assets" onAdd={addAsset} addLabel="Add asset">
-          {assets.map((asset, index) => <AssetFields key={asset.key} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
-        </EntrySection>
+          <section className="ai-import" aria-labelledby="ai-import-title">
+            <div><p className="eyebrow">Optional accelerator</p><h2 id="ai-import-title">AI-assisted import</h2></div>
+            <p>Copy the Prompt to your own AI agent, then paste its JSON response here. Nothing is sent automatically.</p>
+            <label className="checkbox-label"><input type="checkbox" checked={includeDraftInPrompt} onChange={(event) => setIncludeDraftInPrompt(event.target.checked)} />Include current draft in Prompt</label>
+            {includeDraftInPrompt && <p className="sensitive-warning">This Prompt contains sensitive financial data.</p>}
+            <label>AI Prompt<textarea aria-label="AI Prompt" value={prompt} readOnly rows={12} /></label>
+            <button type="button" onClick={() => navigator.clipboard?.writeText(prompt)}>Copy Prompt</button>
+            <label>Agent JSON<textarea aria-label="Agent JSON" value={agentJson} onChange={(event) => setAgentJson(event.target.value)} rows={12} placeholder="Paste raw JSON or one JSON code block" /></label>
+            {importError && <p className="form-error" role="alert">{importError}</p>}
+            <button type="button" onClick={previewImport}>Preview import</button>
+          </section>
+          <StepActions next="assets" onChange={setStep} />
+        </section>}
 
-        <EntrySection title="Liabilities" onAdd={addLiability} addLabel="Add liability">
-          {liabilities.map((liability, index) => <LiabilityFields key={liability.key} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
-        </EntrySection>
+        {step === "assets" && <section className="entry-step-panel" aria-labelledby="assets-step-title">
+          <div className="step-heading"><p className="eyebrow">Step 2 of 4</p><h2 id="assets-step-title">Assets</h2><p>Review every active asset and its value for this Snapshot.</p></div>
+          <EntrySection title="Assets" onAdd={addAsset} addLabel="Add asset">
+            {assets.map((asset, index) => <AssetFields key={asset.key} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
+          </EntrySection>
+          <StepActions previous="settings" next="liabilities" onChange={setStep} />
+        </section>}
+
+        {step === "liabilities" && <section className="entry-step-panel" aria-labelledby="liabilities-step-title">
+          <div className="step-heading"><p className="eyebrow">Step 3 of 4</p><h2 id="liabilities-step-title">Liabilities</h2><p>Review every active liability and its balance for this Snapshot.</p></div>
+          <EntrySection title="Liabilities" onAdd={addLiability} addLabel="Add liability">
+            {liabilities.map((liability, index) => <LiabilityFields key={liability.key} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
+          </EntrySection>
+          <StepActions previous="assets" next="review" onChange={setStep} />
+        </section>}
+
+        {step === "review" && <section className="entry-step-panel review-step" aria-labelledby="review-step-title">
+          <div className="step-heading"><p className="eyebrow">Step 4 of 4</p><h2 id="review-step-title">Review and save</h2><p>Confirm the complete balance sheet before creating the immutable Snapshot.</p></div>
+          <dl className="review-summary">
+            <div><dt>Snapshot date</dt><dd>{snapshotDate || "Missing"}</dd></div>
+            <div><dt>Base currency</dt><dd>{baseCurrency || "Missing"}</dd></div>
+            <div><dt>Assets</dt><dd>{assets.length}</dd></div>
+            <div><dt>Liabilities</dt><dd>{liabilities.length}</dd></div>
+          </dl>
+          {(!settingsComplete || !assetsComplete || !liabilitiesComplete) && <p className="review-warning">Some steps still contain missing or invalid values. Saving will take you to the first field to fix.</p>}
+          <div className="step-actions"><button type="button" onClick={() => setStep("liabilities")}>Back</button><button className="primary-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Snapshot"}</button></div>
+        </section>}
 
         {archiveTarget && <section className="confirm-dialog" role="dialog" aria-modal="true" aria-label={`Archive ${archiveTarget.name}?`}>
           <h2>Archive {archiveTarget.name}?</h2>
@@ -225,10 +268,29 @@ export default function EntryPage() {
           <div><button type="button" onClick={() => setImportReview(undefined)}>Cancel</button><button type="button" autoFocus onClick={applyImport}>Apply import</button></div>
         </section>}
         {error && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Snapshot"}</button>
       </form>}
     </main>
   );
+}
+
+const entrySteps: Array<{ id: EntryStep; label: string }> = [
+  { id: "settings", label: "Settings" },
+  { id: "assets", label: "Assets" },
+  { id: "liabilities", label: "Liabilities" },
+  { id: "review", label: "Review" },
+];
+
+function EntryStepper({ current, completed, onChange }: { current: EntryStep; completed: Record<EntryStep, boolean>; onChange: (step: EntryStep) => void }) {
+  return <nav className="entry-stepper" aria-label="Entry steps">{entrySteps.map((item, index) =>
+    <button key={item.id} type="button" aria-label={item.label} aria-current={current === item.id ? "step" : undefined} data-complete={completed[item.id] || undefined} onClick={() => onChange(item.id)}>
+      <span aria-hidden="true" className="step-number">{completed[item.id] ? "✓" : index + 1}</span>
+      <span>{item.label}</span>
+    </button>,
+  )}</nav>;
+}
+
+function StepActions({ previous, next, onChange }: { previous?: EntryStep; next: EntryStep; onChange: (step: EntryStep) => void }) {
+  return <div className="step-actions">{previous && <button type="button" onClick={() => onChange(previous)}>Back</button>}<button className="primary-action" type="button" onClick={() => onChange(next)}>Continue</button></div>;
 }
 
 function EntrySection({ title, onAdd, addLabel, children }: { title: string; onAdd: () => void; addLabel: string; children: React.ReactNode }) {
@@ -295,9 +357,12 @@ function liabilityDraft(liability: LiabilityResponse, fact: LiabilityFactRespons
   return { key: liability.id ?? `liability-${index}`, id: liability.id, name: liability.name ?? "", amount: fact?.money?.amount ?? "", effectiveDate: day(fact?.effectiveAt) || today(), source: fact?.source ?? "", carriedFrom: fact ? carriedFrom : undefined };
 }
 
-function valid(assets: AssetDraft[], liabilities: LiabilityDraft[], snapshotDate: string) {
-  return assets.every((item) => item.name.trim() && item.type && item.liquidity && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim()) &&
-    liabilities.every((item) => item.name.trim() && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim());
+function validAssets(assets: AssetDraft[], snapshotDate: string): boolean {
+  return assets.every((item) => Boolean(item.name.trim() && item.type && item.liquidity && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim()));
+}
+
+function validLiabilities(liabilities: LiabilityDraft[], snapshotDate: string): boolean {
+  return liabilities.every((item) => Boolean(item.name.trim() && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim()));
 }
 
 function mergeAssets(current: AssetDraft[], imported: AgentImport, nextKey: { current: number }): AssetDraft[] {

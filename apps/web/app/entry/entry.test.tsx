@@ -44,6 +44,35 @@ afterEach(() => {
 });
 
 describe("Balance-sheet entry", () => {
+  it("shows Input as the current app-level destination", async () => {
+    render(<EntryPage />);
+
+    await screen.findByRole("heading", { name: "Update balance sheet" });
+    expect(screen.getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Input" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("moves freely through entry steps without losing the draft", async () => {
+    render(<EntryPage />);
+
+    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    expect(within(steps).getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("step");
+    expect(screen.getByLabelText("Base currency")).toBeTruthy();
+    expect(screen.queryByLabelText("Cash amount")).toBeNull();
+
+    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
+    fireEvent.change(screen.getByLabelText("Cash name"), { target: { value: "Emergency reserve" } });
+    fireEvent.click(within(steps).getByRole("button", { name: "Liabilities" }));
+    expect(screen.getByRole("button", { name: "Add liability" })).toBeTruthy();
+    expect(screen.queryByLabelText("Emergency reserve amount")).toBeNull();
+
+    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
+    expect(screen.getByLabelText("Emergency reserve amount")).toBeTruthy();
+    fireEvent.click(within(steps).getByRole("button", { name: "Review" }));
+    expect(screen.getByRole("heading", { name: "Review and save" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save Snapshot" })).toBeTruthy();
+  });
+
   it("previews and merges fenced agent JSON without calling the API", async () => {
     render(<EntryPage />);
 
@@ -87,14 +116,16 @@ describe("Balance-sheet entry", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Apply import" }));
 
+    fireEvent.click(screen.getByRole("button", { name: "Assets" }));
     expect((screen.getByLabelText("Updated cash amount") as HTMLInputElement).value).toBe("1200.00");
+    fireEvent.click(screen.getByRole("button", { name: "Liabilities" }));
     expect(screen.getByRole("group", { name: "New liability" })).toBeTruthy();
     expect(api.captureSnapshot).not.toHaveBeenCalled();
   });
 
   it("accepts one unlabeled fenced JSON block", async () => {
     render(<EntryPage />);
-    await screen.findByLabelText("Cash amount");
+    await screen.findByLabelText("Agent JSON");
 
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `\`\`\`
 {
@@ -111,7 +142,7 @@ describe("Balance-sheet entry", () => {
 
   it("requires a validated currency in agent output", async () => {
     render(<EntryPage />);
-    await screen.findByLabelText("Cash amount");
+    await screen.findByLabelText("Agent JSON");
 
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
       "schemaVersion": 1,
@@ -126,7 +157,7 @@ describe("Balance-sheet entry", () => {
 
   it("rejects unknown IDs and injection-shaped fields without changing the draft", async () => {
     render(<EntryPage />);
-    await screen.findByLabelText("Cash amount");
+    await screen.findByLabelText("Agent JSON");
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
       "schemaVersion": 1,
       "baseCurrency": "USD",
@@ -146,6 +177,7 @@ describe("Balance-sheet entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
     expect((await screen.findByRole("alert")).textContent).toMatch(/not allowed|unknown/i);
+    fireEvent.click(screen.getByRole("button", { name: "Assets" }));
     expect((screen.getByLabelText("Cash amount") as HTMLInputElement).value).toBe("1000.00");
     expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
   });
@@ -153,6 +185,8 @@ describe("Balance-sheet entry", () => {
   it("archives an existing position only after explicit confirmation", async () => {
     render(<EntryPage />);
 
+    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     fireEvent.click(await screen.findByRole("button", { name: "Archive Cash" }));
     expect(api.archiveAsset).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Archive Cash?" })).toBeTruthy();
@@ -168,13 +202,17 @@ describe("Balance-sheet entry", () => {
 
     render(<EntryPage />);
 
-    const name = await screen.findByLabelText("Cash name") as HTMLInputElement;
+    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
+    const name = screen.getByLabelText("Cash name") as HTMLInputElement;
     fireEvent.change(name, { target: { value: "Updated cash" } });
+    fireEvent.click(within(steps).getByRole("button", { name: "Review" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
 
     expect(await screen.findByText("Base currency is required.")).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByLabelText("Base currency"));
-    expect(name.value).toBe("Updated cash");
+    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
+    expect((screen.getByLabelText("Updated cash name") as HTMLInputElement).value).toBe("Updated cash");
     expect(api.captureSnapshot).not.toHaveBeenCalled();
   });
 
@@ -183,6 +221,7 @@ describe("Balance-sheet entry", () => {
 
     expect(await screen.findByRole("heading", { name: "Update balance sheet" })).toBeTruthy();
     expect((screen.getByLabelText("Base currency") as HTMLInputElement).value).toBe("USD");
+    fireEvent.click(screen.getByRole("button", { name: "Assets" }));
     expect((screen.getByLabelText("Cash amount") as HTMLInputElement).value).toBe("1000.00");
     expect(screen.getByText("Carried forward from Jul 31, 2026")).toBeTruthy();
 
@@ -194,6 +233,7 @@ describe("Balance-sheet entry", () => {
     fireEvent.change(within(newAsset).getByLabelText("Amount"), { target: { value: "2500.00" } });
     fireEvent.change(within(newAsset).getByLabelText("Source"), { target: { value: "Broker statement" } });
 
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
 
     await waitFor(() => expect(api.captureSnapshot).toHaveBeenCalledOnce());

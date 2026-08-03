@@ -38,6 +38,9 @@ The first release should allow a financially engaged individual to answer:
 
 - Create, edit, and archive manually entered assets.
 - Create, edit, and archive manually entered liabilities.
+- Keep Dashboard and Input as distinct app-level destinations. Within Input, guide the
+  user through settings, assets, liabilities, and final review without discarding drafts
+  when the user changes steps.
 - Record a base-currency value, effective date, and source for each valuation or balance.
 - When an original value uses another currency, manually convert it using an explicit
   exchange-rate assumption recorded in provenance.
