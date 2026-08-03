@@ -277,6 +277,18 @@ describe("Balance-sheet entry", () => {
     expect((screen.getByLabelText("Emergency cash name") as HTMLInputElement).value).toBe("Emergency cash");
   });
 
+  it("identifies and focuses a collection-level API validation error", async () => {
+    api.captureSnapshot.mockResolvedValue({ error: { errors: [{ field: "assets", message: "must include every active asset exactly once" }] } });
+    render(<EntryPage />);
+
+    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    fireEvent.click(within(steps).getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
+
+    expect(await screen.findByText("Assets must include every active asset exactly once.")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add asset" })));
+  });
+
   it("prefills the latest facts and captures all active positions with a new asset", async () => {
     render(<EntryPage />);
 

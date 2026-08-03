@@ -256,7 +256,7 @@ export default function EntryPage() {
 
         {step === "assets" && <section className="entry-step-panel" aria-labelledby="assets-step-title">
           <div className="step-heading"><p className="eyebrow">Step 2 of 4</p><h2 id="assets-step-title" tabIndex={-1}>Assets</h2><p>Review every active asset and its value for this Snapshot.</p></div>
-          <EntrySection title="Assets" onAdd={addAsset} addLabel="Add asset">
+          <EntrySection title="Assets" apiField="assets" onAdd={addAsset} addLabel="Add asset">
             {assets.map((asset, index) => <AssetFields key={asset.key} index={index} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
           </EntrySection>
           <StepActions previous="settings" next="liabilities" onChange={setStep} />
@@ -264,7 +264,7 @@ export default function EntryPage() {
 
         {step === "liabilities" && <section className="entry-step-panel" aria-labelledby="liabilities-step-title">
           <div className="step-heading"><p className="eyebrow">Step 3 of 4</p><h2 id="liabilities-step-title" tabIndex={-1}>Liabilities</h2><p>Review every active liability and its balance for this Snapshot.</p></div>
-          <EntrySection title="Liabilities" onAdd={addLiability} addLabel="Add liability">
+          <EntrySection title="Liabilities" apiField="liabilities" onAdd={addLiability} addLabel="Add liability">
             {liabilities.map((liability, index) => <LiabilityFields key={liability.key} index={index} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
           </EntrySection>
           <StepActions previous="assets" next="review" onChange={setStep} />
@@ -319,8 +319,8 @@ function StepActions({ previous, next, onChange }: { previous?: EntryStep; next:
   return <div className="step-actions">{previous && <button type="button" onClick={() => onChange(previous)}>Back</button>}<button className="primary-action" type="button" onClick={() => onChange(next)}>Continue</button></div>;
 }
 
-function EntrySection({ title, onAdd, addLabel, children }: { title: string; onAdd: () => void; addLabel: string; children: React.ReactNode }) {
-  return <section className="entry-section"><div className="section-heading"><h2>{title}</h2><button type="button" onClick={onAdd}>{addLabel}</button></div><div className="entry-list">{children}</div></section>;
+function EntrySection({ title, apiField, onAdd, addLabel, children }: { title: string; apiField: "assets" | "liabilities"; onAdd: () => void; addLabel: string; children: React.ReactNode }) {
+  return <section className="entry-section"><div className="section-heading"><h2>{title}</h2><button data-api-field={apiField} type="button" onClick={onAdd}>{addLabel}</button></div><div className="entry-list">{children}</div></section>;
 }
 
 function ModalDialog({ label, onDismiss, children }: { label: string; onDismiss: () => void; children: React.ReactNode }) {
@@ -444,7 +444,9 @@ function formatApiError(error: { field?: string; message?: string }): string {
     .toLowerCase();
   const label = collection
     ? `${collection[1] === "assets" ? "Asset" : "Liability"} ${Number(collection[2]) + 1}${suffix ? ` ${suffix}` : ""}`
-    : field === "baseCurrency" ? "Base currency"
+    : field === "assets" ? "Assets"
+      : field === "liabilities" ? "Liabilities"
+        : field === "baseCurrency" ? "Base currency"
       : field === "asOf" ? "Snapshot date"
         : field === "recordedAt" ? "Recorded time"
           : "Request";
