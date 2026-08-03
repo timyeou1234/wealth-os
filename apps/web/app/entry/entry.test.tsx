@@ -43,6 +43,10 @@ afterEach(() => {
   cleanup();
 });
 
+async function selectManualEntry() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Manual entry" }));
+}
+
 describe("Balance-sheet entry", () => {
   it("shows Input as the current app-level destination", async () => {
     render(<EntryPage />);
@@ -52,10 +56,36 @@ describe("Balance-sheet entry", () => {
     expect(screen.getByRole("link", { name: "Input" }).getAttribute("aria-current")).toBe("page");
   });
 
-  it("moves freely through entry steps without losing the draft", async () => {
+  it("opens AI-assisted import as the default Input mode", async () => {
     render(<EntryPage />);
 
-    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    const aiTab = await screen.findByRole("tab", { name: "AI-assisted import" });
+    expect(aiTab.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Manual entry" }).getAttribute("aria-selected")).toBe("false");
+    expect(screen.getByRole("heading", { name: "AI-assisted import" })).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Entry steps" })).toBeNull();
+  });
+
+  it("switches Input modes with standard tab keyboard controls", async () => {
+    render(<EntryPage />);
+
+    const aiTab = await screen.findByRole("tab", { name: "AI-assisted import" });
+    const manualTab = screen.getByRole("tab", { name: "Manual entry" });
+    aiTab.focus();
+    fireEvent.keyDown(aiTab, { key: "ArrowLeft" });
+
+    expect(manualTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(manualTab);
+    fireEvent.keyDown(manualTab, { key: "ArrowRight" });
+    expect(aiTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(aiTab);
+  });
+
+  it("moves freely through entry steps without losing the draft", async () => {
+    render(<EntryPage />);
+    await selectManualEntry();
+
+    const steps = screen.getByRole("navigation", { name: "Entry steps" });
     expect(within(steps).getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("step");
     expect(screen.getByLabelText("Base currency")).toBeTruthy();
     expect(screen.queryByLabelText("Cash amount")).toBeNull();
@@ -63,13 +93,17 @@ describe("Balance-sheet entry", () => {
 
     fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     fireEvent.change(screen.getByLabelText("Cash name"), { target: { value: "Emergency reserve" } });
-    fireEvent.click(within(steps).getByRole("button", { name: "Liabilities" }));
+    fireEvent.click(screen.getByRole("tab", { name: "AI-assisted import" }));
+    expect(screen.getByLabelText("Agent JSON")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Manual entry" }));
+    const restoredSteps = screen.getByRole("navigation", { name: "Entry steps" });
+    fireEvent.click(within(restoredSteps).getByRole("button", { name: "Liabilities" }));
     expect(screen.getByRole("button", { name: "Add liability" })).toBeTruthy();
     expect(screen.queryByLabelText("Emergency reserve amount")).toBeNull();
 
-    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
+    fireEvent.click(within(restoredSteps).getByRole("button", { name: "Assets" }));
     expect(screen.getByLabelText("Emergency reserve amount")).toBeTruthy();
-    fireEvent.click(within(steps).getByRole("button", { name: "Review" }));
+    fireEvent.click(within(restoredSteps).getByRole("button", { name: "Review" }));
     expect(screen.getByRole("heading", { name: "Review and save" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Snapshot" })).toBeTruthy();
   });
@@ -123,6 +157,8 @@ describe("Balance-sheet entry", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Apply import" }));
 
+    expect(screen.getByRole("tab", { name: "Manual entry" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("heading", { name: "Review and save" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Assets" }));
     expect((screen.getByLabelText("Updated cash amount") as HTMLInputElement).value).toBe("1200.00");
     fireEvent.click(screen.getByRole("button", { name: "Liabilities" }));
@@ -146,13 +182,17 @@ describe("Balance-sheet entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
     expect(screen.getByText("Change Snapshot date: Aug 2, 2026 → Aug 1, 2026")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await selectManualEntry();
     expect((screen.getByLabelText("Base currency") as HTMLInputElement).value).toBe("USD");
   });
 
   it("does not reinterpret existing monetary facts in another base currency", async () => {
     render(<EntryPage />);
-    const baseCurrency = await screen.findByLabelText("Base currency") as HTMLInputElement;
+    await selectManualEntry();
+    const baseCurrency = screen.getByLabelText("Base currency") as HTMLInputElement;
     expect(baseCurrency.readOnly).toBe(true);
+    fireEvent.click(screen.getByRole("tab", { name: "AI-assisted import" }));
 
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
       "schemaVersion": 1,
@@ -248,6 +288,7 @@ describe("Balance-sheet entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
     expect((await screen.findByRole("alert")).textContent).toMatch(/not allowed|unknown/i);
+    await selectManualEntry();
     fireEvent.click(screen.getByRole("button", { name: "Assets" }));
     expect((screen.getByLabelText("Cash amount") as HTMLInputElement).value).toBe("1000.00");
     expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
@@ -255,8 +296,9 @@ describe("Balance-sheet entry", () => {
 
   it("archives an existing position only after explicit confirmation", async () => {
     render(<EntryPage />);
+    await selectManualEntry();
 
-    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    const steps = screen.getByRole("navigation", { name: "Entry steps" });
     fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     fireEvent.click(await screen.findByRole("button", { name: "Archive Cash" }));
     expect(api.archiveAsset).not.toHaveBeenCalled();
@@ -272,8 +314,9 @@ describe("Balance-sheet entry", () => {
     api.listSnapshots.mockResolvedValue({ data: [] });
 
     render(<EntryPage />);
+    await selectManualEntry();
 
-    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    const steps = screen.getByRole("navigation", { name: "Entry steps" });
     fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     const name = screen.getByLabelText("Cash name") as HTMLInputElement;
     fireEvent.change(name, { target: { value: "Updated cash" } });
@@ -290,8 +333,9 @@ describe("Balance-sheet entry", () => {
   it("maps an API validation error back to its step and first affected field", async () => {
     api.captureSnapshot.mockResolvedValue({ error: { errors: [{ field: "assets[0].money.amount", message: "must use the currency's supported precision" }] } });
     render(<EntryPage />);
+    await selectManualEntry();
 
-    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    const steps = screen.getByRole("navigation", { name: "Entry steps" });
     fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     fireEvent.change(screen.getByLabelText("Cash name"), { target: { value: "Emergency cash" } });
     fireEvent.click(within(steps).getByRole("button", { name: "Review" }));
@@ -306,8 +350,9 @@ describe("Balance-sheet entry", () => {
   it("identifies and focuses a collection-level API validation error", async () => {
     api.captureSnapshot.mockResolvedValue({ error: { errors: [{ field: "assets", message: "must include every active asset exactly once" }] } });
     render(<EntryPage />);
+    await selectManualEntry();
 
-    const steps = await screen.findByRole("navigation", { name: "Entry steps" });
+    const steps = screen.getByRole("navigation", { name: "Entry steps" });
     fireEvent.click(within(steps).getByRole("button", { name: "Review" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
 
@@ -317,8 +362,8 @@ describe("Balance-sheet entry", () => {
 
   it("captures structured manual-conversion provenance for a foreign-currency asset", async () => {
     render(<EntryPage />);
+    await selectManualEntry();
 
-    await screen.findByRole("heading", { name: "Update balance sheet" });
     fireEvent.click(screen.getByRole("button", { name: "Assets" }));
     fireEvent.click(screen.getByLabelText("Cash converted from another currency"));
     fireEvent.change(screen.getByLabelText("Cash original amount"), { target: { value: "800.00" } });
@@ -353,8 +398,8 @@ describe("Balance-sheet entry", () => {
       liabilities: [],
     } });
     render(<EntryPage />);
+    await selectManualEntry();
 
-    await screen.findByRole("heading", { name: "Update balance sheet" });
     fireEvent.click(screen.getByRole("button", { name: "Assets" }));
 
     expect((screen.getByLabelText("Cash converted from another currency") as HTMLInputElement).checked).toBe(true);
@@ -364,8 +409,8 @@ describe("Balance-sheet entry", () => {
 
   it("prefills the latest facts and captures all active positions with a new asset", async () => {
     render(<EntryPage />);
+    await selectManualEntry();
 
-    expect(await screen.findByRole("heading", { name: "Update balance sheet" })).toBeTruthy();
     expect((screen.getByLabelText("Base currency") as HTMLInputElement).value).toBe("USD");
     fireEvent.click(screen.getByRole("button", { name: "Assets" }));
     expect((screen.getByLabelText("Cash amount") as HTMLInputElement).value).toBe("1000.00");

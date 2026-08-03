@@ -44,6 +44,7 @@ type LiabilityDraft = {
 
 type ArchiveTarget = { kind: "asset" | "liability"; id: string; key: string; name: string };
 type EntryStep = "settings" | "assets" | "liabilities" | "review";
+type InputMode = "manual" | "ai";
 
 const instant = (day: string) => new Date(`${day}T00:00:00Z`).toISOString();
 const day = (value?: string) => value?.slice(0, 10) ?? "";
@@ -58,8 +59,11 @@ export default function EntryPage() {
   const router = useRouter();
   const nextKey = useRef(0);
   const formRef = useRef<HTMLFormElement>(null);
+  const manualModeTabRef = useRef<HTMLButtonElement>(null);
+  const aiModeTabRef = useRef<HTMLButtonElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<InputMode>("ai");
   const [step, setStep] = useState<EntryStep>("settings");
   const [validationFocusRequest, setValidationFocusRequest] = useState(0);
   const [apiFocus, setApiFocus] = useState<{ field: string; request: number }>();
@@ -119,6 +123,14 @@ export default function EntryPage() {
     setLiabilities((items) => [...items, { key, name: "", amount: "", effectiveDate: snapshotDate, source: "" }]);
   };
 
+  const changeModeWithKeyboard = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const nextMode = event.key === "Home" ? "manual" : event.key === "End" ? "ai" : event.key === "ArrowLeft" || event.key === "ArrowRight" ? (mode === "ai" ? "manual" : "ai") : undefined;
+    if (!nextMode) return;
+    event.preventDefault();
+    setMode(nextMode);
+    (nextMode === "manual" ? manualModeTabRef : aiModeTabRef).current?.focus();
+  };
+
   const confirmArchive = async () => {
     if (!archiveTarget) return;
     try {
@@ -168,6 +180,8 @@ export default function EntryPage() {
     setLiabilities((current) => mergeLiabilities(current, data, nextKey));
     setImportReview(undefined);
     setAgentJson("");
+    setStep("review");
+    setMode("manual");
   };
 
   const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
@@ -250,29 +264,23 @@ export default function EntryPage() {
         <div><p className="eyebrow">Balance-sheet entry</p><h1>Update balance sheet</h1></div>
       </header>
       {loading ? <p>Loading current positions…</p> : <form ref={formRef} onSubmit={submit} noValidate>
-        <EntryStepper
-          current={step}
-          completed={{ settings: settingsComplete, assets: assetsComplete, liabilities: liabilitiesComplete, review: settingsComplete && assetsComplete && liabilitiesComplete }}
-          onChange={setStep}
-        />
+        <div className="input-mode-tabs" role="tablist" aria-label="Input mode">
+          <button ref={manualModeTabRef} id="input-mode-manual-tab" role="tab" type="button" aria-selected={mode === "manual"} aria-controls="input-mode-manual-panel" tabIndex={mode === "manual" ? 0 : -1} onClick={() => setMode("manual")} onKeyDown={changeModeWithKeyboard}>Manual entry</button>
+          <button ref={aiModeTabRef} id="input-mode-ai-tab" role="tab" type="button" aria-selected={mode === "ai"} aria-controls="input-mode-ai-panel" tabIndex={mode === "ai" ? 0 : -1} onClick={() => setMode("ai")} onKeyDown={changeModeWithKeyboard}>AI-assisted import</button>
+        </div>
+
+        {mode === "manual" && <div id="input-mode-manual-panel" role="tabpanel" aria-labelledby="input-mode-manual-tab">
+          <EntryStepper
+            current={step}
+            completed={{ settings: settingsComplete, assets: assetsComplete, liabilities: liabilitiesComplete, review: settingsComplete && assetsComplete && liabilitiesComplete }}
+            onChange={setStep}
+          />
 
         {step === "settings" && <section className="entry-step-panel" aria-labelledby="settings-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 1 of 4</p><h2 id="settings-step-title" tabIndex={-1}>Settings</h2><p>Set the Snapshot context or accelerate entry with your own AI agent.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 1 of 4</p><h2 id="settings-step-title" tabIndex={-1}>Settings</h2><p>Set the Snapshot context for this balance sheet.</p></div>
           <section className="entry-settings" aria-label="Snapshot settings">
             <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
             <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} readOnly={baseCurrencyLocked} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
-          </section>
-
-          <section className="ai-import" aria-labelledby="ai-import-title">
-            <div><p className="eyebrow">Optional accelerator</p><h2 id="ai-import-title">AI-assisted import</h2></div>
-            <p>Copy the Prompt to your own AI agent, then paste its JSON response here. Nothing is sent automatically.</p>
-            <label className="checkbox-label"><input type="checkbox" checked={includeDraftInPrompt} onChange={(event) => setIncludeDraftInPrompt(event.target.checked)} />Include current draft in Prompt</label>
-            {includeDraftInPrompt && <p className="sensitive-warning">This Prompt contains sensitive financial data.</p>}
-            <label>AI Prompt<textarea aria-label="AI Prompt" value={prompt} readOnly rows={12} /></label>
-            <button type="button" onClick={() => navigator.clipboard?.writeText(prompt)}>Copy Prompt</button>
-            <label>Agent JSON<textarea aria-label="Agent JSON" value={agentJson} onChange={(event) => setAgentJson(event.target.value)} rows={12} placeholder="Paste raw JSON or one JSON code block" /></label>
-            {importError && <p className="form-error" role="alert">{importError}</p>}
-            <button type="button" onClick={previewImport}>Preview import</button>
           </section>
           <StepActions next="assets" onChange={setStep} />
         </section>}
@@ -303,6 +311,19 @@ export default function EntryPage() {
           </dl>
           {(!settingsComplete || !assetsComplete || !liabilitiesComplete) && <p className="review-warning">Some steps still contain missing or invalid values. Saving will take you to the first field to fix.</p>}
           <div className="step-actions"><button type="button" onClick={() => setStep("liabilities")}>Back</button><button className="primary-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Snapshot"}</button></div>
+        </section>}
+        </div>}
+
+        {mode === "ai" && <section id="input-mode-ai-panel" role="tabpanel" aria-labelledby="input-mode-ai-tab" className="ai-import">
+          <div><p className="eyebrow">Optional accelerator</p><h2>AI-assisted import</h2></div>
+          <p>Copy the Prompt to your own AI agent, then paste its JSON response here. Nothing is sent automatically.</p>
+          <label className="checkbox-label"><input type="checkbox" checked={includeDraftInPrompt} onChange={(event) => setIncludeDraftInPrompt(event.target.checked)} />Include current draft in Prompt</label>
+          {includeDraftInPrompt && <p className="sensitive-warning">This Prompt contains sensitive financial data.</p>}
+          <label>AI Prompt<textarea aria-label="AI Prompt" value={prompt} readOnly rows={12} /></label>
+          <button type="button" onClick={() => navigator.clipboard?.writeText(prompt)}>Copy Prompt</button>
+          <label>Agent JSON<textarea aria-label="Agent JSON" value={agentJson} onChange={(event) => setAgentJson(event.target.value)} rows={12} placeholder="Paste raw JSON or one JSON code block" /></label>
+          {importError && <p className="form-error" role="alert">{importError}</p>}
+          <button type="button" onClick={previewImport}>Preview import</button>
         </section>}
 
         {archiveTarget && <ModalDialog label={`Archive ${archiveTarget.name}?`} onDismiss={() => setArchiveTarget(undefined)}>

@@ -38,9 +38,11 @@ The first release should allow a financially engaged individual to answer:
 
 - Create, edit, and archive manually entered assets.
 - Create, edit, and archive manually entered liabilities.
-- Keep Dashboard and Input as distinct app-level destinations. Within Input, guide the
-  user through settings, assets, liabilities, and final review without discarding drafts
-  when the user changes steps.
+- Keep Dashboard and Input as distinct app-level destinations. Within Input, expose
+  AI-assisted import and manual entry as peer modes, with AI-assisted import selected by
+  default. Manual entry guides the user through settings, assets, liabilities, and final
+  review. Switching modes or manual-entry steps does not discard the shared draft, and
+  applying an AI import opens the manual review step.
 - Record a base-currency value, effective date, and source for each valuation or balance.
 - When an original value uses another currency, manually convert it using an explicit
   exchange-rate assumption recorded in provenance.
