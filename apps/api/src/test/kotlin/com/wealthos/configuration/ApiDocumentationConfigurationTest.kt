@@ -89,4 +89,23 @@ class ApiDocumentationConfigurationTest {
                 }
             }
     }
+
+    @Test
+    fun `documents atomic snapshot capture`() {
+        mockMvc.get("/v3/api-docs")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.paths['/api/v1/snapshot-captures'].post.operationId") { value("captureSnapshot") }
+                jsonPath("$.paths['/api/v1/snapshot-captures'].post.responses['201'].content['application/json'].schema['\$ref']") {
+                    value("#/components/schemas/SnapshotResponse")
+                }
+                jsonPath("$.paths['/api/v1/snapshot-captures'].post.responses['400'].content['application/problem+json'].schema['\$ref']") {
+                    value("#/components/schemas/ValidationProblemResponse")
+                }
+                jsonPath("$.paths['/api/v1/snapshot-captures'].post.responses['200']") { doesNotExist() }
+                jsonPath("$.components.schemas.CaptureSnapshotRequest.required") {
+                    value(org.hamcrest.Matchers.hasItems("assets", "liabilities"))
+                }
+            }
+    }
 }

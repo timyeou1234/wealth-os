@@ -38,10 +38,22 @@ The first release should allow a financially engaged individual to answer:
 
 - Create, edit, and archive manually entered assets.
 - Create, edit, and archive manually entered liabilities.
+- Keep Dashboard and Input as distinct app-level destinations. Within Input, expose
+  AI-assisted import and manual entry as peer modes, with AI-assisted import selected by
+  default. Snapshot date and base currency are shared context above both modes. Manual
+  entry guides the user through assets, liabilities, and final review. Switching modes or
+  manual-entry steps does not discard the shared draft, and applying an AI import opens
+  the manual review step.
 - Record a base-currency value, effective date, and source for each valuation or balance.
 - When an original value uses another currency, manually convert it using an explicit
   exchange-rate assumption recorded in provenance.
 - Preserve enough source data to reproduce a historical snapshot.
+- Offer an optional paste-only AI-assisted entry workflow: Wealth OS provides a strict
+  prompt that asks the user's agent to interview across every asset and liability
+  category before producing JSON. The prompt reflects the current shared Snapshot date
+  and base currency, and imported JSON must match that context exactly. Wealth OS
+  validates the JSON locally, but never sends financial data to an AI service or applies
+  imported changes without user review.
 
 ### Financial position
 

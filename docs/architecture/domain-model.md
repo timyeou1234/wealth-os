@@ -55,6 +55,10 @@ so those values are modeled as separate facts rather than mutable entity fields.
 - Values supplied to snapshot calculations are already expressed in that base currency.
 - A manually converted value records the original amount, exchange-rate basis, and
   effective time in its provenance.
+- `ManualConversion` stores that provenance as an optional structured value containing
+  the original `Money`, a human-readable exchange-rate basis, and its effective time.
+  The valuation or balance remains expressed in the Snapshot base currency; Wealth OS
+  records but does not calculate the manual conversion.
 - Automatic foreign-exchange conversion is deferred. Mixed-currency facts produce an
   explicit insufficient-data result rather than implicit conversion.
 
@@ -77,6 +81,11 @@ provenance required to display and recalculate history.
 `asOf` records when the financial position was true. `recordedAt` separately records when
 Wealth OS captured that immutable record. A Snapshot cannot be recorded before its
 financial `asOf` time.
+
+`baseCurrency` optionally records the selected currency context of an application-level
+capture. Atomic entry captures always set it, even for an empty Snapshot, so the next
+entry can restore the user's choice without inferring it from a position. It remains
+optional for older and direct mixed-currency Snapshots and is preserved by corrections.
 
 It enforces:
 

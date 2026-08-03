@@ -16,6 +16,8 @@ class SnapshotJpaEntity(
     val asOf: Instant,
     @Column(name = "recorded_at", nullable = false)
     val recordedAt: Instant,
+    @Column(name = "base_currency", length = 3)
+    val baseCurrency: String?,
     @Column(name = "supersedes_id")
     val supersedesId: UUID?,
     @Column(name = "correction_reason", length = 255)
