@@ -21,9 +21,9 @@ The first release should allow a financially engaged individual to answer:
 
 ## Primary user journey
 
-Issue #66 changes this journey incrementally. The FX-rate infrastructure is implemented
-first; the entry and Snapshot behavior below remains the accepted target until its later
-vertical slices land.
+Issue #66 changes this journey incrementally. FX-rate synchronization and auditable
+Snapshot conversion are implemented first; Input and Dashboard presentation follow in a
+later vertical slice.
 
 1. The user records material assets and liabilities in their original currencies.
 2. Wealth OS converts supported foreign-currency facts into canonical TWD valuations

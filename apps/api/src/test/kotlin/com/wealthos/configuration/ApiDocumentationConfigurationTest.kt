@@ -106,6 +106,10 @@ class ApiDocumentationConfigurationTest {
                 jsonPath("$.components.schemas.CaptureSnapshotRequest.required") {
                     value(org.hamcrest.Matchers.hasItems("assets", "liabilities"))
                 }
+                jsonPath("$.components.schemas.CaptureAssetRequest.properties.originalMoney") { exists() }
+                jsonPath("$.components.schemas.CaptureAssetRequest.properties.declaredRate") { exists() }
+                jsonPath("$.components.schemas.AssetFactResponse.properties.appliedConversion") { exists() }
+                jsonPath("$.components.schemas.AppliedConversionResponse.properties.rateDate") { exists() }
             }
     }
 }

@@ -51,8 +51,8 @@ so those values are modeled as separate facts rather than mutable entity fields.
 - Precision loss fails by default.
 - Callers must select a `RoundingMode` explicitly when rounding is intended.
 - Arithmetic and comparison require the same currency.
-The following is the target Snapshot model for Issue #66; the initial FX-rate
-infrastructure slice does not yet change Snapshot capture:
+The Snapshot FX slice of Issue #66 implements the following model. Legacy manual
+conversion remains temporarily available until the Input UI migrates:
 
 - TWD is the canonical valuation currency for Snapshot calculations.
 - A Snapshot position preserves its original Money and an explicit applied conversion
@@ -65,6 +65,8 @@ infrastructure slice does not yet change Snapshot capture:
   records but does not calculate the manual conversion.
 - Conversion is performed by the Snapshot capture application before domain calculation;
   the immutable position value consumed by calculations is always TWD.
+- Canonical TWD Money uses zero fraction digits and HALF_EVEN rounding for final
+  conversion, independent of the JDK's ISO metadata.
 
 ## Identity
 

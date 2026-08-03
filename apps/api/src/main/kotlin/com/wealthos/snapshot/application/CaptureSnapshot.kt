@@ -15,6 +15,10 @@ import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.shared.Money
+import com.wealthos.domain.shared.AppliedConversion
+import com.wealthos.domain.shared.CanonicalValuationCurrency
+import com.wealthos.domain.shared.FxRateType
+import com.wealthos.fxrate.application.GetFxRates
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotRepository
@@ -22,12 +26,14 @@ import com.wealthos.shared.application.RequestValidationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
+import java.time.ZoneId
 
 @Service
 class CaptureSnapshot(
     private val assets: AssetRepository,
     private val liabilities: LiabilityRepository,
     private val snapshots: SnapshotRepository,
+    private val getFxRates: GetFxRates,
 ) {
     @Transactional
     fun execute(command: CaptureSnapshotCommand): Snapshot {
@@ -59,14 +65,14 @@ class CaptureSnapshot(
                 assets = capturedAssets,
                 assetValuations =
                     capturedAssets.zip(command.assets).mapIndexed { index, (asset, input) ->
-                        validateFact(input.money, input.effectiveAt, input.manualConversion, command, "assets[$index]")
-                        AssetValuation(asset.id, input.money, input.effectiveAt, input.source, input.manualConversion)
+                        val fact = resolveFact(input.money, input.originalMoney, input.declaredRate, input.effectiveAt, input.manualConversion, command, "assets[$index]")
+                        AssetValuation(asset.id, fact.money, input.effectiveAt, input.source, input.manualConversion, fact.appliedConversion)
                     },
                 liabilities = capturedLiabilities,
                 liabilityBalances =
                     capturedLiabilities.zip(command.liabilities).mapIndexed { index, (liability, input) ->
-                        validateFact(input.money, input.effectiveAt, input.manualConversion, command, "liabilities[$index]")
-                        LiabilityBalance(liability.id, input.money, input.effectiveAt, input.source, input.manualConversion)
+                        val fact = resolveFact(input.money, input.originalMoney, input.declaredRate, input.effectiveAt, input.manualConversion, command, "liabilities[$index]")
+                        LiabilityBalance(liability.id, fact.money, input.effectiveAt, input.source, input.manualConversion, fact.appliedConversion)
                     },
             )
         return snapshots.save(snapshot)
@@ -106,17 +112,68 @@ class CaptureSnapshot(
         }
     }
 
-    private fun validateFact(
-        money: Money,
+    private fun resolveFact(
+        money: Money?,
+        originalMoney: Money?,
+        declaredRate: DeclaredFxRate?,
         effectiveAt: Instant,
         manualConversion: ManualConversion?,
         command: CaptureSnapshotCommand,
         field: String,
-    ) {
-        if (money.currency != command.baseCurrency) {
+    ): ResolvedFact {
+        if (originalMoney != null) {
+            if (command.baseCurrency != CanonicalValuationCurrency.TWD) {
+                throw RequestValidationException("baseCurrency", "must be TWD when originalMoney is supplied")
+            }
+            if (money != null || manualConversion != null) {
+                throw RequestValidationException(field, "must use either originalMoney or legacy money conversion fields")
+            }
+            if (originalMoney.amount.signum() < 0) {
+                throw RequestValidationException("$field.originalMoney.amount", "must be a non-negative decimal amount")
+            }
+            if (effectiveAt.isAfter(command.asOf)) {
+                throw RequestValidationException("$field.effectiveAt", "must not be after asOf")
+            }
+            if (originalMoney.currency == CanonicalValuationCurrency.TWD) {
+                if (declaredRate != null) {
+                    throw RequestValidationException("$field.declaredRate", "must be omitted for TWD originalMoney")
+                }
+                return ResolvedFact(originalMoney, null)
+            }
+            val asOfDate = command.asOf.atZone(TAIPEI).toLocalDate()
+            if (declaredRate != null) {
+                if (declaredRate.rateDate.isAfter(asOfDate)) {
+                    throw RequestValidationException("$field.declaredRate.rateDate", "must not be after the snapshot date")
+                }
+                val conversion = AppliedConversion.of(
+                    originalMoney,
+                    declaredRate.rate,
+                    declaredRate.rateDate,
+                    "USER",
+                    FxRateType.USER_DECLARED,
+                    declaredRate.basis,
+                )
+                return ResolvedFact(conversion.toTwdMoney(), conversion)
+            }
+            val resolved = getFxRates.execute(asOfDate, listOf(originalMoney.currency)).rates.singleOrNull()
+                ?: throw RequestValidationException("$field.originalMoney.currency", "has no CBC rate on or before the snapshot date")
+            val conversion = AppliedConversion.of(
+                originalMoney,
+                resolved.rate,
+                resolved.rateDate,
+                resolved.provider,
+                FxRateType.REFERENCE_RATE,
+            )
+            return ResolvedFact(conversion.toTwdMoney(), conversion)
+        }
+        if (declaredRate != null) {
+            throw RequestValidationException("$field.declaredRate", "requires originalMoney")
+        }
+        val legacyMoney = money ?: throw RequestValidationException("$field.money", "or originalMoney is required")
+        if (legacyMoney.currency != command.baseCurrency) {
             throw RequestValidationException("$field.money.currency", "must match baseCurrency")
         }
-        if (money.amount.signum() < 0) {
+        if (legacyMoney.amount.signum() < 0) {
             throw RequestValidationException("$field.money.amount", "must be a non-negative decimal amount")
         }
         if (effectiveAt.isAfter(command.asOf)) {
@@ -134,6 +191,7 @@ class CaptureSnapshot(
                 "must not be after asOf",
             )
         }
+        return ResolvedFact(legacyMoney, null)
     }
 }
 
@@ -150,7 +208,9 @@ data class CaptureAsset(
     val name: String,
     val type: AssetType,
     val liquidity: Liquidity,
-    val money: Money,
+    val money: Money?,
+    val originalMoney: Money?,
+    val declaredRate: DeclaredFxRate?,
     val effectiveAt: Instant,
     val source: ValuationSource,
     val manualConversion: ManualConversion?,
@@ -159,8 +219,16 @@ data class CaptureAsset(
 data class CaptureLiability(
     val id: LiabilityId?,
     val name: String,
-    val money: Money,
+    val money: Money?,
+    val originalMoney: Money?,
+    val declaredRate: DeclaredFxRate?,
     val effectiveAt: Instant,
     val source: LiabilitySource,
     val manualConversion: ManualConversion?,
 )
+
+private data class ResolvedFact(val money: Money, val appliedConversion: AppliedConversion?)
+
+data class DeclaredFxRate(val rate: java.math.BigDecimal, val rateDate: java.time.LocalDate, val basis: String)
+
+private val TAIPEI: ZoneId = ZoneId.of("Asia/Taipei")

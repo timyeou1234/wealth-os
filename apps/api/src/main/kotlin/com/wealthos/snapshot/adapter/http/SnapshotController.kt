@@ -9,6 +9,7 @@ import com.wealthos.domain.liability.LiabilityBalance
 import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.ManualConversion
+import com.wealthos.domain.shared.AppliedConversion
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.snapshot.application.SnapshotApplication
@@ -118,6 +119,7 @@ data class SnapshotResponse(
                         position.valuation.effectiveAt,
                         position.valuation.source.value,
                         position.valuation.manualConversion?.let(ManualConversionResponse::from),
+                        position.valuation.appliedConversion?.let(AppliedConversionResponse::from),
                     )
                 },
                 liabilities = snapshot.liabilityPositions.map { position ->
@@ -128,6 +130,7 @@ data class SnapshotResponse(
                         position.balance.effectiveAt,
                         position.balance.source.value,
                         position.balance.manualConversion?.let(ManualConversionResponse::from),
+                        position.balance.appliedConversion?.let(AppliedConversionResponse::from),
                     )
                 },
             )
@@ -139,5 +142,26 @@ data class ManualConversionResponse(val originalMoney: MoneyResponse, val exchan
         fun from(conversion: ManualConversion) = ManualConversionResponse(MoneyResponse(conversion.originalValue.amount.toPlainString(), conversion.originalValue.currency.code), conversion.exchangeRateBasis, conversion.effectiveAt)
     }
 }
-data class AssetFactResponse(val id: String, val name: String, val type: AssetType, val liquidity: Liquidity, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null)
-data class LiabilityFactResponse(val id: String, val name: String, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null)
+data class AppliedConversionResponse(
+    val originalMoney: MoneyResponse,
+    @field:Schema(example = "32.292") val rate: String,
+    @field:Schema(example = "2026-07-31") val rateDate: java.time.LocalDate,
+    @field:Schema(example = "CBC") val provider: String,
+    @field:Schema(example = "REFERENCE_RATE") val rateType: String,
+    val basis: String?,
+    @field:Schema(example = "HALF_EVEN") val roundingMode: String,
+) {
+    companion object {
+        fun from(conversion: AppliedConversion) = AppliedConversionResponse(
+            MoneyResponse(conversion.originalMoney.amount.toPlainString(), conversion.originalMoney.currency.code),
+            conversion.rate.toPlainString(),
+            conversion.rateDate,
+            conversion.provider,
+            conversion.rateType.name,
+            conversion.basis,
+            conversion.roundingMode.name,
+        )
+    }
+}
+data class AssetFactResponse(val id: String, val name: String, val type: AssetType, val liquidity: Liquidity, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null, val appliedConversion: AppliedConversionResponse? = null)
+data class LiabilityFactResponse(val id: String, val name: String, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null, val appliedConversion: AppliedConversionResponse? = null)

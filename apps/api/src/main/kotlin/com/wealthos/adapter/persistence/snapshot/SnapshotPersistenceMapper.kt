@@ -11,6 +11,9 @@ import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.shared.ManualConversion
+import com.wealthos.domain.shared.AppliedConversion
+import com.wealthos.domain.shared.FxRateType
+import java.math.RoundingMode
 import com.wealthos.domain.snapshot.CorrectionReason
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotAssetPosition
@@ -48,6 +51,14 @@ internal object SnapshotPersistenceMapper {
                 conversionOriginalCurrency = position.valuation.manualConversion?.originalValue?.currency?.code,
                 conversionExchangeRateBasis = position.valuation.manualConversion?.exchangeRateBasis,
                 conversionEffectiveAt = position.valuation.manualConversion?.effectiveAt,
+                appliedOriginalAmount = position.valuation.appliedConversion?.originalMoney?.amount,
+                appliedOriginalCurrency = position.valuation.appliedConversion?.originalMoney?.currency?.code,
+                appliedRate = position.valuation.appliedConversion?.rate,
+                appliedRateDate = position.valuation.appliedConversion?.rateDate,
+                appliedProvider = position.valuation.appliedConversion?.provider,
+                appliedRateType = position.valuation.appliedConversion?.rateType?.name,
+                appliedBasis = position.valuation.appliedConversion?.basis,
+                appliedRoundingMode = position.valuation.appliedConversion?.roundingMode?.name,
             )
         }
 
@@ -68,6 +79,14 @@ internal object SnapshotPersistenceMapper {
                 conversionOriginalCurrency = position.balance.manualConversion?.originalValue?.currency?.code,
                 conversionExchangeRateBasis = position.balance.manualConversion?.exchangeRateBasis,
                 conversionEffectiveAt = position.balance.manualConversion?.effectiveAt,
+                appliedOriginalAmount = position.balance.appliedConversion?.originalMoney?.amount,
+                appliedOriginalCurrency = position.balance.appliedConversion?.originalMoney?.currency?.code,
+                appliedRate = position.balance.appliedConversion?.rate,
+                appliedRateDate = position.balance.appliedConversion?.rateDate,
+                appliedProvider = position.balance.appliedConversion?.provider,
+                appliedRateType = position.balance.appliedConversion?.rateType?.name,
+                appliedBasis = position.balance.appliedConversion?.basis,
+                appliedRoundingMode = position.balance.appliedConversion?.roundingMode?.name,
             )
         }
 
@@ -106,6 +125,7 @@ internal object SnapshotPersistenceMapper {
                     effectiveAt = entity.effectiveAt,
                     source = ValuationSource.of(entity.source),
                     manualConversion = entity.manualConversion(),
+                    appliedConversion = entity.appliedConversion(),
                 ),
         )
     }
@@ -122,6 +142,7 @@ internal object SnapshotPersistenceMapper {
                     effectiveAt = entity.effectiveAt,
                     source = LiabilitySource.of(entity.source),
                     manualConversion = entity.manualConversion(),
+                    appliedConversion = entity.appliedConversion(),
                 ),
         )
     }
@@ -141,6 +162,32 @@ internal object SnapshotPersistenceMapper {
                 originalValue = Money.of(amount, Currency.of(requireNotNull(conversionOriginalCurrency))),
                 exchangeRateBasis = requireNotNull(conversionExchangeRateBasis),
                 effectiveAt = requireNotNull(conversionEffectiveAt),
+            )
+        }
+
+    private fun SnapshotAssetPositionJpaEntity.appliedConversion(): AppliedConversion? =
+        appliedOriginalAmount?.let { amount ->
+            require(appliedRoundingMode == RoundingMode.HALF_EVEN.name) { "Unsupported applied rounding mode" }
+            AppliedConversion.of(
+                Money.of(amount, Currency.of(requireNotNull(appliedOriginalCurrency))),
+                requireNotNull(appliedRate),
+                requireNotNull(appliedRateDate),
+                requireNotNull(appliedProvider),
+                FxRateType.valueOf(requireNotNull(appliedRateType)),
+                appliedBasis,
+            )
+        }
+
+    private fun SnapshotLiabilityPositionJpaEntity.appliedConversion(): AppliedConversion? =
+        appliedOriginalAmount?.let { amount ->
+            require(appliedRoundingMode == RoundingMode.HALF_EVEN.name) { "Unsupported applied rounding mode" }
+            AppliedConversion.of(
+                Money.of(amount, Currency.of(requireNotNull(appliedOriginalCurrency))),
+                requireNotNull(appliedRate),
+                requireNotNull(appliedRateDate),
+                requireNotNull(appliedProvider),
+                FxRateType.valueOf(requireNotNull(appliedRateType)),
+                appliedBasis,
             )
         }
 }
