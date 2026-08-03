@@ -5,6 +5,7 @@ import Dashboard from "./page";
 
 const api = vi.hoisted(() => ({
   getFinancialHealth: vi.fn(),
+  getFxRates: vi.fn(),
   getSnapshot: vi.fn(),
   listSnapshots: vi.fn(),
 }));
@@ -13,6 +14,7 @@ vi.mock("./api/client", () => api);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
   window.history.replaceState({}, "", "/");
 });
 
@@ -61,9 +63,54 @@ describe("Dashboard", () => {
     expect(screen.getByText("Bank statement")).toBeTruthy();
     expect(screen.getByText("Car loan")).toBeTruthy();
     expect(screen.getByText("Lender statement")).toBeTruthy();
-    expect(screen.getByText("Total Assets = Sum of all asset values in the base currency")).toBeTruthy();
+    expect(screen.getByText("Total Assets = Sum of all asset values in canonical TWD")).toBeTruthy();
     expect(screen.getByText("Net Worth = Total Assets - Total Liabilities")).toBeTruthy();
     expect(screen.getByText("Included in immediately liquid assets: assets classified as LIQUID. SEMI_LIQUID and ILLIQUID assets are excluded.")).toBeTruthy();
+  });
+
+  it("uses the snapshot historical rate to display every monetary value without changing ratios", async () => {
+    window.localStorage.setItem("wealthos.displayCurrency", "JPY");
+    window.history.replaceState({}, "", "/?displayCurrency=USD");
+    api.listSnapshots.mockResolvedValue({ data: [{ id: "snapshot-1", asOf: "2026-07-31T00:00:00Z" }] });
+    api.getFinancialHealth.mockResolvedValue({ data: {
+      status: "CALCULATED",
+      totalAssets: { amount: "3229", currency: "TWD" },
+      totalLiabilities: { amount: "323", currency: "TWD" },
+      netWorth: { amount: "2906", currency: "TWD" },
+      debtRatio: "0.100031",
+      liquidityRatio: "1.000000",
+    } });
+    api.getSnapshot.mockResolvedValue({ data: {
+      id: "snapshot-1",
+      asOf: "2026-07-31T00:00:00Z",
+      assets: [{
+        id: "cash", name: "EUR cash", type: "CASH", liquidity: "LIQUID",
+        money: { amount: "3229", currency: "TWD" },
+        appliedConversion: { originalMoney: { amount: "85.00", currency: "EUR" } },
+        effectiveAt: "2026-07-31T00:00:00Z", source: "Statement",
+      }],
+      liabilities: [{ id: "loan", name: "Loan", money: { amount: "323", currency: "TWD" }, effectiveAt: "2026-07-31T00:00:00Z", source: "Statement" }],
+    } });
+    api.getFxRates.mockResolvedValue({ data: {
+      valuationCurrency: "TWD",
+      asOf: "2026-07-31",
+      rates: [{ originalCurrency: "USD", rate: "32.29", rateDate: "2026-07-30", provider: "CBC", rateType: "REFERENCE_RATE" }],
+      missingCurrencies: [],
+    } });
+
+    render(<Dashboard />);
+
+    expect((await screen.findAllByText("$100.00")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("$10.00").length).toBeGreaterThan(0);
+    expect(screen.getByText("$90.00")).toBeTruthy();
+    expect(screen.getByText("10.00%")).toBeTruthy();
+    expect(screen.getByText("100.00%")).toBeTruthy();
+    expect(screen.getByText("NT$3,229 canonical")).toBeTruthy();
+    expect(screen.getByText("€85.00 original")).toBeTruthy();
+    expect(screen.getByText("Rate date Jul 30, 2026")).toBeTruthy();
+    expect(api.getFxRates).toHaveBeenCalledWith({ query: { asOf: "2026-07-31", currencies: ["USD"] } });
+    expect((screen.getByRole("combobox", { name: "Display currency" }) as HTMLSelectElement).value).toBe("USD");
+    expect(window.localStorage.getItem("wealthos.displayCurrency")).toBe("USD");
   });
 
   it("does not let an earlier snapshot response overwrite the selected snapshot", async () => {
