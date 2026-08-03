@@ -111,6 +111,19 @@ describe("Dashboard", () => {
     expect(api.getFxRates).toHaveBeenCalledWith({ query: { asOf: "2026-07-31", currencies: ["USD"] } });
     expect((screen.getByRole("combobox", { name: "Display currency" }) as HTMLSelectElement).value).toBe("USD");
     expect(window.localStorage.getItem("wealthos.displayCurrency")).toBe("USD");
+
+    api.getFxRates.mockResolvedValue({ data: {
+      valuationCurrency: "TWD",
+      asOf: "2026-07-31",
+      rates: [{ originalCurrency: "JPY", rate: "0.20", rateDate: "2026-07-29", provider: "CBC", rateType: "REFERENCE_RATE" }],
+      missingCurrencies: [],
+    } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Display currency" }), { target: { value: "JPY" } });
+
+    expect((await screen.findAllByText("¥16,145")).length).toBeGreaterThan(0);
+    expect(api.getFxRates).toHaveBeenLastCalledWith({ query: { asOf: "2026-07-31", currencies: ["JPY"] } });
+    expect(window.localStorage.getItem("wealthos.displayCurrency")).toBe("JPY");
+    expect(screen.getByText("10.00%")).toBeTruthy();
   });
 
   it("does not let an earlier snapshot response overwrite the selected snapshot", async () => {

@@ -5,19 +5,15 @@ import Link from "next/link";
 import { getFinancialHealth, getFxRates, getSnapshot, listSnapshots } from "./api/client";
 import type { AssetFactResponse, FinancialHealthResponse, LiabilityFactResponse, MoneyResponse, SnapshotResponse } from "./api/client";
 import { AppNavigation } from "./app-navigation";
+import { divideMoney, formatMoney } from "./decimal-money";
 
 const displayCurrencies = ["TWD", "USD", "JPY", "EUR", "HKD"];
 const currencyCode = (value: string | null) => value?.toUpperCase().match(/^[A-Z]{3}$/)?.[0];
-const formatMoney = (amount: number, currency: string) => new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency,
-  ...(currency === "TWD" ? { maximumFractionDigits: 0 } : {}),
-}).format(amount);
-const money = (value: MoneyResponse | null | undefined, displayCurrency: string, rate?: number) => {
+const money = (value: MoneyResponse | null | undefined, displayCurrency: string, rate?: string) => {
   if (!value?.amount || !value.currency) return "—";
-  if (value.currency === displayCurrency) return formatMoney(Number(value.amount), displayCurrency);
-  if (value.currency !== "TWD" || displayCurrency === "TWD") return formatMoney(Number(value.amount), value.currency);
-  return rate ? formatMoney(Number(value.amount) / rate, displayCurrency) : "—";
+  if (value.currency === displayCurrency) return formatMoney(value.amount, displayCurrency);
+  if (value.currency !== "TWD" || displayCurrency === "TWD") return formatMoney(value.amount, value.currency);
+  return rate ? formatMoney(divideMoney(value.amount, rate, displayCurrency), displayCurrency) : "—";
 };
 
 const percent = (value: string | null | undefined) => (value ? `${(Number(value) * 100).toFixed(2)}%` : "—");
@@ -29,7 +25,7 @@ export default function Dashboard() {
   const [health, setHealth] = useState<FinancialHealthResponse>();
   const [snapshot, setSnapshot] = useState<SnapshotResponse>();
   const [displayCurrency, setDisplayCurrency] = useState("TWD");
-  const [displayRate, setDisplayRate] = useState<{ rate: number; rateDate?: string }>();
+  const [displayRate, setDisplayRate] = useState<{ rate: string; rateDate?: string }>();
   const [rateUnavailable, setRateUnavailable] = useState(false);
 
   useEffect(() => {
@@ -70,7 +66,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!snapshot?.asOf) return;
     if (displayCurrency === "TWD") {
-      setDisplayRate({ rate: 1, rateDate: snapshot.asOf.slice(0, 10) });
+      setDisplayRate({ rate: "1", rateDate: snapshot.asOf.slice(0, 10) });
       setRateUnavailable(false);
       return;
     }
@@ -81,7 +77,7 @@ export default function Dashboard() {
       .then(({ data }) => {
         if (cancelled) return;
         const item = data?.rates?.find((candidate) => candidate.originalCurrency === displayCurrency);
-        if (item?.rate) setDisplayRate({ rate: Number(item.rate), rateDate: item.rateDate });
+        if (item?.rate) setDisplayRate({ rate: item.rate, rateDate: item.rateDate });
         else setRateUnavailable(true);
       })
       .catch(() => { if (!cancelled) setRateUnavailable(true); });
@@ -134,12 +130,12 @@ function Card({ label, value, emphasis = false }: { label: string; value: string
   return <article className={emphasis ? "card emphasis" : "card"}><p>{label}</p><strong>{value}</strong></article>;
 }
 
-function Amount({ item, displayCurrency, rate }: { item: AssetFactResponse | LiabilityFactResponse; displayCurrency: string; rate?: number }) {
+function Amount({ item, displayCurrency, rate }: { item: AssetFactResponse | LiabilityFactResponse; displayCurrency: string; rate?: string }) {
   const original = item.appliedConversion?.originalMoney;
-  return <><span>{money(item.money, displayCurrency, rate)}</span>{displayCurrency !== "TWD" && item.money?.amount && <small>{formatMoney(Number(item.money.amount), "TWD")} canonical</small>}{original?.amount && original.currency && original.currency !== "TWD" && <small>{formatMoney(Number(original.amount), original.currency)} original</small>}</>;
+  return <><span>{money(item.money, displayCurrency, rate)}</span>{displayCurrency !== "TWD" && item.money?.amount && <small>{formatMoney(item.money.amount, "TWD")} canonical</small>}{original?.amount && original.currency && original.currency !== "TWD" && <small>{formatMoney(original.amount, original.currency)} original</small>}</>;
 }
 
-function AssetsTable({ rows, displayCurrency, rate }: { rows: AssetFactResponse[]; displayCurrency: string; rate?: number }) {
+function AssetsTable({ rows, displayCurrency, rate }: { rows: AssetFactResponse[]; displayCurrency: string; rate?: string }) {
   return <section className="position-table">
     <h2>Assets</h2>
     <div className="table-scroll"><table>
@@ -149,7 +145,7 @@ function AssetsTable({ rows, displayCurrency, rate }: { rows: AssetFactResponse[
   </section>;
 }
 
-function LiabilitiesTable({ rows, displayCurrency, rate }: { rows: LiabilityFactResponse[]; displayCurrency: string; rate?: number }) {
+function LiabilitiesTable({ rows, displayCurrency, rate }: { rows: LiabilityFactResponse[]; displayCurrency: string; rate?: string }) {
   return <section className="position-table"><h2>Liabilities</h2><div className="table-scroll"><table>
     <thead><tr><th>Name</th><th>Amount</th><th>Effective date</th><th>Source</th></tr></thead>
     <tbody>{rows.map((item) => <tr key={item.id}><td>{item.name}</td><td className="money-detail"><Amount item={item} displayCurrency={displayCurrency} rate={rate} /></td><td>{date(item.effectiveAt)}</td><td>{item.source}</td></tr>)}</tbody>
