@@ -66,6 +66,21 @@ describe("Balance-sheet entry", () => {
     expect(screen.queryByRole("navigation", { name: "Entry steps" })).toBeNull();
   });
 
+  it("shares Snapshot context above both modes and starts Manual entry at Assets", async () => {
+    render(<EntryPage />);
+
+    await screen.findByRole("tab", { name: "AI-assisted import" });
+    expect((screen.getByLabelText("Snapshot date") as HTMLInputElement).value).toBe("2026-08-02");
+    expect((screen.getByLabelText("Base currency") as HTMLInputElement).value).toBe("USD");
+    await selectManualEntry();
+
+    const steps = screen.getByRole("navigation", { name: "Entry steps" });
+    expect(within(steps).queryByRole("button", { name: "Settings" })).toBeNull();
+    expect(within(steps).getByRole("button", { name: "Assets" }).getAttribute("aria-current")).toBe("step");
+    expect(screen.getByText("Step 1 of 3")).toBeTruthy();
+    expect(screen.getByLabelText("Base currency")).toBeTruthy();
+  });
+
   it("switches Input modes with standard tab keyboard controls", async () => {
     render(<EntryPage />);
 
@@ -81,17 +96,31 @@ describe("Balance-sheet entry", () => {
     expect(document.activeElement).toBe(aiTab);
   });
 
+  it("updates the AI Prompt from the shared Snapshot context", async () => {
+    api.listSnapshots.mockResolvedValue({ data: [] });
+    render(<EntryPage />);
+
+    const prompt = await screen.findByLabelText("AI Prompt") as HTMLTextAreaElement;
+    expect(prompt.value).toContain("Set a valid Base currency in Wealth OS before using this Prompt.");
+    fireEvent.change(screen.getByLabelText("Base currency"), { target: { value: "TWD" } });
+    fireEvent.change(screen.getByLabelText("Snapshot date"), { target: { value: "2026-08-01" } });
+
+    expect(prompt.value).toContain("Use this exact Snapshot context: Base currency TWD; Snapshot date 2026-08-01.");
+    expect(prompt.value).toContain('"baseCurrency": "TWD"');
+    expect(prompt.value).toContain('"snapshotDate": "2026-08-01"');
+    expect(prompt.value).not.toContain("First confirm the base currency and Snapshot date");
+  });
+
   it("moves freely through entry steps without losing the draft", async () => {
     render(<EntryPage />);
     await selectManualEntry();
 
     const steps = screen.getByRole("navigation", { name: "Entry steps" });
-    expect(within(steps).getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("step");
+    expect(within(steps).getByRole("button", { name: "Assets" }).getAttribute("aria-current")).toBe("step");
     expect(screen.getByLabelText("Base currency")).toBeTruthy();
-    expect(screen.queryByLabelText("Cash amount")).toBeNull();
+    expect(screen.getByLabelText("Cash amount")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save Snapshot" })).toBeNull();
 
-    fireEvent.click(within(steps).getByRole("button", { name: "Assets" }));
     fireEvent.change(screen.getByLabelText("Cash name"), { target: { value: "Emergency reserve" } });
     fireEvent.click(screen.getByRole("tab", { name: "AI-assisted import" }));
     expect(screen.getByLabelText("Agent JSON")).toBeTruthy();
@@ -114,7 +143,8 @@ describe("Balance-sheet entry", () => {
     const prompt = await screen.findByLabelText("AI Prompt") as HTMLTextAreaElement;
     expect(prompt.value).not.toContain(assetId);
     expect(prompt.value).not.toContain("Bank statement");
-    expect(prompt.value).not.toContain('"baseCurrency": "USD"');
+    expect(prompt.value).toContain('"baseCurrency": "USD"');
+    expect(prompt.value).toContain("Use this exact Snapshot context: Base currency USD; Snapshot date 2026-08-02.");
     expect(prompt.value).toContain("Ask one concise question at a time and wait for the user's answer");
     expect(prompt.value).toContain("Cash and bank accounts");
     expect(prompt.value).toContain("Investments and retirement accounts");
@@ -204,7 +234,7 @@ describe("Balance-sheet entry", () => {
     expect(api.captureSnapshot).not.toHaveBeenCalled();
   });
 
-  it("previews snapshot setting changes before applying an agent import", async () => {
+  it("rejects agent Snapshot context that differs from the shared settings", async () => {
     render(<EntryPage />);
     await screen.findByLabelText("Agent JSON");
 
@@ -217,13 +247,13 @@ describe("Balance-sheet entry", () => {
     }` } });
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
-    expect(screen.getByText("Change Snapshot date: Aug 2, 2026 → Aug 1, 2026")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await selectManualEntry();
+    expect((await screen.findByRole("alert")).textContent).toContain("snapshotDate must match the shared Snapshot date 2026-08-02");
+    expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
+    expect((screen.getByLabelText("Snapshot date") as HTMLInputElement).value).toBe("2026-08-02");
     expect((screen.getByLabelText("Base currency") as HTMLInputElement).value).toBe("USD");
   });
 
-  it("does not reinterpret existing monetary facts in another base currency", async () => {
+  it("rejects agent base currency that differs from the shared settings", async () => {
     render(<EntryPage />);
     await selectManualEntry();
     const baseCurrency = screen.getByLabelText("Base currency") as HTMLInputElement;
@@ -239,7 +269,7 @@ describe("Balance-sheet entry", () => {
     }` } });
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("Base currency cannot change while the draft contains monetary facts");
+    expect((await screen.findByRole("alert")).textContent).toContain("baseCurrency must match the shared Base currency USD");
     expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
     expect(baseCurrency.value).toBe("USD");
   });
@@ -250,6 +280,7 @@ describe("Balance-sheet entry", () => {
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
       "schemaVersion": 1,
       "baseCurrency": "USD",
+      "snapshotDate": "2026-08-02",
       "assets": [],
       "liabilities": []
     }` } });
@@ -278,6 +309,7 @@ describe("Balance-sheet entry", () => {
 {
   "schemaVersion": 1,
   "baseCurrency": "USD",
+  "snapshotDate": "2026-08-02",
   "assets": [],
   "liabilities": []
 }

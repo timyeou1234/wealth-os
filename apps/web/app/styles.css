@@ -30,10 +30,11 @@ select { background: #182237; border: 1px solid #31415f; border-radius: 8px; col
 
 .entry-page { max-width: 1180px; margin: 0 auto; padding: 48px 24px 80px; }
 .entry-header { align-items: end; display: flex; justify-content: space-between; margin-bottom: 32px; }
+.snapshot-context { margin-bottom: 28px; }
 .input-mode-tabs { border-bottom: 1px solid #263551; display: flex; gap: 8px; margin-bottom: 28px; }
 .input-mode-tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: #aeb9ca; padding: 12px 16px; }
 .input-mode-tabs button[aria-selected="true"] { border-bottom-color: #70aef6; color: #edf2f9; font-weight: 700; }
-.entry-stepper { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.entry-stepper { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .entry-stepper button { align-items: center; background: #151e30; border-color: #263551; color: #aeb9ca; display: flex; gap: 10px; text-align: left; }
 .entry-stepper button[aria-current="step"] { background: #1e3455; border-color: #70aef6; color: #edf2f9; }
 .entry-stepper button[data-complete="true"] .step-number { background: #2f7658; }

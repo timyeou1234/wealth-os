@@ -43,7 +43,7 @@ type LiabilityDraft = {
 };
 
 type ArchiveTarget = { kind: "asset" | "liability"; id: string; key: string; name: string };
-type EntryStep = "settings" | "assets" | "liabilities" | "review";
+type EntryStep = "assets" | "liabilities" | "review";
 type InputMode = "manual" | "ai";
 
 const instant = (day: string) => new Date(`${day}T00:00:00Z`).toISOString();
@@ -64,7 +64,7 @@ export default function EntryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<InputMode>("ai");
-  const [step, setStep] = useState<EntryStep>("settings");
+  const [step, setStep] = useState<EntryStep>("assets");
   const [validationFocusRequest, setValidationFocusRequest] = useState(0);
   const [apiFocus, setApiFocus] = useState<{ field: string; request: number }>();
   const [showValidation, setShowValidation] = useState(false);
@@ -101,7 +101,7 @@ export default function EntryPage() {
   }, []);
 
   useEffect(() => {
-    if (validationFocusRequest > 0) formRef.current?.querySelector<HTMLElement>(".entry-step-panel :invalid")?.focus();
+    if (validationFocusRequest > 0) formRef.current?.querySelector<HTMLElement>(":invalid")?.focus();
   }, [validationFocusRequest]);
 
   useEffect(() => {
@@ -155,12 +155,13 @@ export default function EntryPage() {
         new Set(assets.flatMap((item) => item.id ? [item.id] : [])),
         new Set(liabilities.flatMap((item) => item.id ? [item.id] : [])),
       );
-      if (data.baseCurrency !== baseCurrency && hasMonetaryFacts(assets, liabilities)) {
-        throw new Error("Base currency cannot change while the draft contains monetary facts. Clear all position amounts before changing it.");
+      if (data.baseCurrency !== baseCurrency) {
+        throw new Error(`baseCurrency must match the shared Base currency ${baseCurrency}.`);
+      }
+      if (data.snapshotDate !== snapshotDate) {
+        throw new Error(`snapshotDate must match the shared Snapshot date ${snapshotDate}.`);
       }
       const changes = [
-        ...(data.baseCurrency !== baseCurrency ? [`Change base currency: ${baseCurrency || "Not set"} → ${data.baseCurrency}`] : []),
-        ...(data.snapshotDate && data.snapshotDate !== snapshotDate ? [`Change Snapshot date: ${displayDate(snapshotDate)} → ${displayDate(data.snapshotDate)}`] : []),
         ...data.assets.flatMap((item) => item.id ? describeAssetUpdate(assets.find((asset) => asset.id === item.id)!, item) : [`Add asset: ${item.name}`]),
         ...data.liabilities.flatMap((item) => item.id ? describeLiabilityUpdate(liabilities.find((liability) => liability.id === item.id)!, item) : [`Add liability: ${item.name}`]),
       ];
@@ -174,8 +175,6 @@ export default function EntryPage() {
   const applyImport = () => {
     if (!importReview) return;
     const data = importReview.data;
-    setBaseCurrency(data.baseCurrency);
-    if (data.snapshotDate) setSnapshotDate(data.snapshotDate);
     setAssets((current) => mergeAssets(current, data, nextKey));
     setLiabilities((current) => mergeLiabilities(current, data, nextKey));
     setImportReview(undefined);
@@ -194,10 +193,10 @@ export default function EntryPage() {
     event.preventDefault();
     setError(undefined);
     if (!settingsComplete || !assetsComplete || !liabilitiesComplete) {
-      const invalidStep: EntryStep = !settingsComplete ? "settings" : !assetsComplete ? "assets" : "liabilities";
+      const invalidStep: EntryStep = !assetsComplete ? "assets" : "liabilities";
       setShowValidation(true);
       setError("Complete every required field before saving the Snapshot.");
-      setStep(invalidStep);
+      if (settingsComplete) setStep(invalidStep);
       setValidationFocusRequest((request) => request + 1);
       return;
     }
@@ -264,6 +263,14 @@ export default function EntryPage() {
         <div><p className="eyebrow">Balance-sheet entry</p><h1>Update balance sheet</h1></div>
       </header>
       {loading ? <p>Loading current positions…</p> : <form ref={formRef} onSubmit={submit} noValidate>
+        <section className="snapshot-context" aria-labelledby="snapshot-context-title">
+          <div className="step-heading"><p className="eyebrow">Shared settings</p><h2 id="snapshot-context-title">Snapshot context</h2><p>These values apply to both AI-assisted import and manual entry.</p></div>
+          <div className="entry-settings">
+            <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
+            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} readOnly={baseCurrencyLocked} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
+          </div>
+        </section>
+
         <div className="input-mode-tabs" role="tablist" aria-label="Input mode">
           <button ref={manualModeTabRef} id="input-mode-manual-tab" role="tab" type="button" aria-selected={mode === "manual"} aria-controls="input-mode-manual-panel" tabIndex={mode === "manual" ? 0 : -1} onClick={() => setMode("manual")} onKeyDown={changeModeWithKeyboard}>Manual entry</button>
           <button ref={aiModeTabRef} id="input-mode-ai-tab" role="tab" type="button" aria-selected={mode === "ai"} aria-controls="input-mode-ai-panel" tabIndex={mode === "ai" ? 0 : -1} onClick={() => setMode("ai")} onKeyDown={changeModeWithKeyboard}>AI-assisted import</button>
@@ -272,29 +279,20 @@ export default function EntryPage() {
         {mode === "manual" && <div id="input-mode-manual-panel" role="tabpanel" aria-labelledby="input-mode-manual-tab">
           <EntryStepper
             current={step}
-            completed={{ settings: settingsComplete, assets: assetsComplete, liabilities: liabilitiesComplete, review: settingsComplete && assetsComplete && liabilitiesComplete }}
+            completed={{ assets: assetsComplete, liabilities: liabilitiesComplete, review: settingsComplete && assetsComplete && liabilitiesComplete }}
             onChange={setStep}
           />
 
-        {step === "settings" && <section className="entry-step-panel" aria-labelledby="settings-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 1 of 4</p><h2 id="settings-step-title" tabIndex={-1}>Settings</h2><p>Set the Snapshot context for this balance sheet.</p></div>
-          <section className="entry-settings" aria-label="Snapshot settings">
-            <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} readOnly={baseCurrencyLocked} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
-          </section>
-          <StepActions next="assets" onChange={setStep} />
-        </section>}
-
         {step === "assets" && <section className="entry-step-panel" aria-labelledby="assets-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 2 of 4</p><h2 id="assets-step-title" tabIndex={-1}>Assets</h2><p>Review every active asset and its value for this Snapshot.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 1 of 3</p><h2 id="assets-step-title" tabIndex={-1}>Assets</h2><p>Review every active asset and its value for this Snapshot.</p></div>
           <EntrySection title="Assets" apiField="assets" onAdd={addAsset} addLabel="Add asset">
             {assets.map((asset, index) => <AssetFields key={asset.key} index={index} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} baseCurrency={baseCurrency} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
           </EntrySection>
-          <StepActions previous="settings" next="liabilities" onChange={setStep} />
+          <StepActions next="liabilities" onChange={setStep} />
         </section>}
 
         {step === "liabilities" && <section className="entry-step-panel" aria-labelledby="liabilities-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 3 of 4</p><h2 id="liabilities-step-title" tabIndex={-1}>Liabilities</h2><p>Review every active liability and its balance for this Snapshot.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 2 of 3</p><h2 id="liabilities-step-title" tabIndex={-1}>Liabilities</h2><p>Review every active liability and its balance for this Snapshot.</p></div>
           <EntrySection title="Liabilities" apiField="liabilities" onAdd={addLiability} addLabel="Add liability">
             {liabilities.map((liability, index) => <LiabilityFields key={liability.key} index={index} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} baseCurrency={baseCurrency} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
           </EntrySection>
@@ -302,7 +300,7 @@ export default function EntryPage() {
         </section>}
 
         {step === "review" && <section className="entry-step-panel review-step" aria-labelledby="review-step-title">
-          <div className="step-heading"><p className="eyebrow">Step 4 of 4</p><h2 id="review-step-title" tabIndex={-1}>Review and save</h2><p>Confirm the complete balance sheet before creating the immutable Snapshot.</p></div>
+          <div className="step-heading"><p className="eyebrow">Step 3 of 3</p><h2 id="review-step-title" tabIndex={-1}>Review and save</h2><p>Confirm the complete balance sheet before creating the immutable Snapshot.</p></div>
           <dl className="review-summary">
             <div><dt>Snapshot date</dt><dd>{snapshotDate || "Missing"}</dd></div>
             <div><dt>Base currency</dt><dd>{baseCurrency || "Missing"}</dd></div>
@@ -344,7 +342,6 @@ export default function EntryPage() {
 }
 
 const entrySteps: Array<{ id: EntryStep; label: string }> = [
-  { id: "settings", label: "Settings" },
   { id: "assets", label: "Assets" },
   { id: "liabilities", label: "Liabilities" },
   { id: "review", label: "Review" },
@@ -540,7 +537,7 @@ function validConversion(value: ManualConversionDraft | undefined, snapshotDate:
 function stepForApiField(field: string): EntryStep {
   if (field.startsWith("assets")) return "assets";
   if (field.startsWith("liabilities")) return "liabilities";
-  return "settings";
+  return "assets";
 }
 
 function formatApiError(error: { field?: string; message?: string }): string {
@@ -585,17 +582,21 @@ function mergeLiabilities(current: LiabilityDraft[], imported: AgentImport, next
 }
 
 function buildPrompt(includeDraft: boolean, snapshotDate: string, baseCurrency: string, assets: AssetDraft[], liabilities: LiabilityDraft[]): string {
+  const contextReady = currencyCode.test(baseCurrency) && Boolean(snapshotDate);
   const shape = {
     schemaVersion: 1,
-    baseCurrency: "TWD",
-    snapshotDate,
+    baseCurrency: contextReady ? baseCurrency : "TWD",
+    snapshotDate: snapshotDate || "YYYY-MM-DD",
     assets: [{ name: "Example foreign-currency asset", type: "CASH", liquidity: "LIQUID", amount: "31250.00", effectiveDate: snapshotDate, source: "Statement description", manualConversion: { originalAmount: "1000.00", originalCurrency: "USD", exchangeRateBasis: "Declared USD/TWD rate 31.25", effectiveDate: snapshotDate } }],
     liabilities: [{ name: "Example liability", amount: "250.00", effectiveDate: snapshotDate, source: "Statement description" }],
   };
   const instructions = [
     "You are conducting a complete personal balance-sheet inventory interview. Do not assume the user's first answer is the full inventory.",
     "Ask one concise question at a time and wait for the user's answer before continuing.",
-    "First confirm the base currency and Snapshot date. Then explicitly cover every asset category: Cash and bank accounts; Investments and retirement accounts; Real estate; Vehicles; Business ownership; and Other assets such as valuables or receivables. Ask about every category even when the user has not mentioned it.",
+    contextReady
+      ? `Use this exact Snapshot context: Base currency ${baseCurrency}; Snapshot date ${snapshotDate}. Do not ask the user to choose different values, and return these exact values in the final JSON.`
+      : "Set a valid Base currency in Wealth OS before using this Prompt.",
+    "Explicitly cover every asset category: Cash and bank accounts; Investments and retirement accounts; Real estate; Vehicles; Business ownership; and Other assets such as valuables or receivables. Ask about every category even when the user has not mentioned it.",
     "Explicitly cover Mortgages, credit cards, personal or business loans, taxes owed, and other liabilities. Ask whether jointly held, foreign-currency, or easily forgotten positions remain.",
     "For every asset, collect name, amount, effective date, source, type, and liquidity. For every liability, collect name, amount, effective date, and source. Ask follow-up questions whenever a required value is missing.",
     "For each foreign-currency position, manually convert it to the base currency. Put the converted value in amount and include manualConversion with originalAmount, originalCurrency, exchangeRateBasis, and effectiveDate. Omit manualConversion for positions already expressed in the base currency.",
