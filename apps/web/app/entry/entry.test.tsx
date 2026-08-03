@@ -81,6 +81,21 @@ describe("Balance-sheet entry", () => {
     expect(screen.getByLabelText("Base currency")).toBeTruthy();
   });
 
+  it("offers prioritized ISO base currencies on first use", async () => {
+    api.listSnapshots.mockResolvedValue({ data: [] });
+    render(<EntryPage />);
+
+    const currency = await screen.findByRole("combobox", { name: "Base currency" }) as HTMLSelectElement;
+    const options = within(currency).getAllByRole("option").map((option) => option.textContent);
+    expect(options.slice(0, 11)).toEqual(["Select currency", "TWD", "USD", "EUR", "JPY", "CNY", "HKD", "GBP", "AUD", "CAD", "SGD"]);
+    expect(options).toContain("CHF");
+    expect(options).toContain("ZAR");
+
+    fireEvent.change(currency, { target: { value: "CHF" } });
+    expect(currency.value).toBe("CHF");
+    expect((screen.getByLabelText("AI Prompt") as HTMLTextAreaElement).value).toContain("Base currency CHF");
+  });
+
   it("switches Input modes with standard tab keyboard controls", async () => {
     render(<EntryPage />);
 
@@ -260,8 +275,8 @@ describe("Balance-sheet entry", () => {
   it("rejects agent base currency that differs from the shared settings", async () => {
     render(<EntryPage />);
     await selectManualEntry();
-    const baseCurrency = screen.getByLabelText("Base currency") as HTMLInputElement;
-    expect(baseCurrency.readOnly).toBe(true);
+    const baseCurrency = screen.getByLabelText("Base currency") as HTMLSelectElement;
+    expect(baseCurrency.disabled).toBe(true);
     fireEvent.click(screen.getByRole("tab", { name: "AI-assisted import" }));
 
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{

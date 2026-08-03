@@ -41,6 +41,12 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ASSET_TYPES = new Set(["CASH", "INVESTMENT", "REAL_ESTATE", "VEHICLE", "BUSINESS", "OTHER"]);
 const LIQUIDITIES = new Set(["LIQUID", "SEMI_LIQUID", "ILLIQUID"]);
 const SUPPORTED_CURRENCIES = new Set(Intl.supportedValuesOf("currency"));
+const PREFERRED_CURRENCIES = ["TWD", "USD", "EUR", "JPY", "CNY", "HKD", "GBP", "AUD", "CAD", "SGD"];
+
+export const supportedCurrencies = [
+  ...PREFERRED_CURRENCIES.filter((currency) => SUPPORTED_CURRENCIES.has(currency)),
+  ...[...SUPPORTED_CURRENCIES].filter((currency) => !PREFERRED_CURRENCIES.includes(currency)).sort(),
+];
 
 export function isSupportedCurrency(value: string): boolean {
   return /^[A-Z]{3}$/.test(value) && SUPPORTED_CURRENCIES.has(value);

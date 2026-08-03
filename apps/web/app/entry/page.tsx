@@ -5,7 +5,7 @@ import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "re
 import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
 import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
 import { AppNavigation } from "../app-navigation";
-import { isSupportedCurrency, parseAgentImport } from "./import";
+import { isSupportedCurrency, parseAgentImport, supportedCurrencies } from "./import";
 import type { AgentImport, AgentImportAsset, AgentImportLiability, AgentImportManualConversion } from "./import";
 
 type AssetType = CaptureAssetRequest["type"];
@@ -266,7 +266,7 @@ export default function EntryPage() {
           <div className="step-heading"><p className="eyebrow">Shared settings</p><h2 id="snapshot-context-title">Snapshot context</h2><p>These values apply to both AI-assisted import and manual entry.</p></div>
           <div className="entry-settings">
             <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !isSupportedCurrency(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} readOnly={baseCurrencyLocked} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !isSupportedCurrency(baseCurrency) && <span className="field-error">Base currency must be a supported ISO 4217 currency.</span>}</label>
+            <label>Base currency<select data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !isSupportedCurrency(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value)} disabled={baseCurrencyLocked} required><option value="">Select currency</option>{supportedCurrencies.map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select>{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !isSupportedCurrency(baseCurrency) && <span className="field-error">Base currency must be a supported ISO 4217 currency.</span>}</label>
           </div>
         </section>
 
