@@ -21,9 +21,14 @@ The first release should allow a financially engaged individual to answer:
 
 ## Primary user journey
 
-1. The user chooses a base currency.
-2. The user records material assets and current base-currency valuations.
-3. The user records liabilities and current base-currency balances.
+Issue #66 changes this journey incrementally. The FX-rate infrastructure is implemented
+first; the entry and Snapshot behavior below remains the accepted target until its later
+vertical slices land.
+
+1. The user records material assets and liabilities in their original currencies.
+2. Wealth OS converts supported foreign-currency facts into canonical TWD valuations
+   using an inspectable historical reference rate.
+3. The user reviews the original facts, conversion evidence, and TWD valuations.
 4. The system calculates total assets, total liabilities, and net worth.
 5. The system derives debt ratio and immediately liquid asset share from the same balance
    sheet.
@@ -44,9 +49,11 @@ The first release should allow a financially engaged individual to answer:
   entry guides the user through assets, liabilities, and final review. Switching modes or
   manual-entry steps does not discard the shared draft, and applying an AI import opens
   the manual review step.
-- Record a base-currency value, effective date, and source for each valuation or balance.
-- When an original value uses another currency, manually convert it using an explicit
-  exchange-rate assumption recorded in provenance.
+- Record an original-currency value, effective date, and source for each valuation or
+  balance.
+- Calculate canonical TWD valuations from CBC reference rates when available. Permit an
+  explicit user-declared rate and basis when a reference rate is unavailable or replaced.
+- Keep display currency separate from canonical TWD calculation currency.
 - Preserve enough source data to reproduce a historical snapshot.
 - Offer an optional paste-only AI-assisted entry workflow: Wealth OS provides a strict
   prompt that asks the user's agent to interview across every asset and liability

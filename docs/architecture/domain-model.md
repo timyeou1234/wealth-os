@@ -51,16 +51,20 @@ so those values are modeled as separate facts rather than mutable entity fields.
 - Precision loss fails by default.
 - Callers must select a `RoundingMode` explicitly when rounding is intended.
 - Arithmetic and comparison require the same currency.
-- The user selects one base currency for an MVP snapshot.
-- Values supplied to snapshot calculations are already expressed in that base currency.
-- A manually converted value records the original amount, exchange-rate basis, and
-  effective time in its provenance.
+The following is the target Snapshot model for Issue #66; the initial FX-rate
+infrastructure slice does not yet change Snapshot capture:
+
+- TWD is the canonical valuation currency for Snapshot calculations.
+- A Snapshot position preserves its original Money and an explicit applied conversion
+  when the original currency is not TWD.
+- An applied conversion records its decimal rate, rate date, provider, rate type, basis
+  when user-declared, and rounding mode.
 - `ManualConversion` stores that provenance as an optional structured value containing
   the original `Money`, a human-readable exchange-rate basis, and its effective time.
   The valuation or balance remains expressed in the Snapshot base currency; Wealth OS
   records but does not calculate the manual conversion.
-- Automatic foreign-exchange conversion is deferred. Mixed-currency facts produce an
-  explicit insufficient-data result rather than implicit conversion.
+- Conversion is performed by the Snapshot capture application before domain calculation;
+  the immutable position value consumed by calculations is always TWD.
 
 ## Identity
 

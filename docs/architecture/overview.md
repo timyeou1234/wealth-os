@@ -69,9 +69,14 @@ They must not reach into one another's persistence implementation.
 - PostgreSQL is the transactional source of truth.
 - Money is modeled with explicit amount and ISO currency; never binary floating point.
 - Time-varying values include effective timestamps and provenance.
-- MVP calculations consume values already expressed in the user's selected base currency.
-- Foreign-currency values are manually converted; their source must record the original
-  amount, conversion rate or basis, and effective time needed to explain the assumption.
+The Issue #66 target architecture uses canonical TWD valuations. Until its Snapshot slice
+lands, the existing manual-conversion capture contract remains active. In the target:
+
+- Financial calculations use canonical TWD valuations. Original-currency values remain
+  attached to their immutable Snapshot facts.
+- Foreign-currency conversion is explicit and reproducible: a Snapshot records the
+  applied rate, rate date, provider, rate type, and original money. Display currency is a
+  presentation preference and never changes canonical calculations.
 - Mixed-currency snapshots are incomplete rather than implicitly converted.
 - Historical snapshots are immutable or reproducible from immutable facts.
 - Historical structure calculations require the point-in-time liquidity classification
@@ -102,5 +107,5 @@ Before persistence begins, the project must resolve or record:
 - Authentication and deployment threat model
 - Observability and audit requirements
 
-Automatic FX conversion, Account and Holding aggregates, security instruments, and market
-data are deliberately deferred beyond the MVP.
+Account and Holding aggregates, security instruments, and market-price data remain
+deferred. Auditable historical CBC FX conversion is governed by ADR-008.

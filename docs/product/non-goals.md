@@ -32,8 +32,11 @@ The MVP does not include:
 - Crypto exchange or wallet synchronization
 - Real-time market prices
 - Automatic property or vehicle valuation
-- Background data refresh
-- Automatic foreign-exchange conversion or historical FX feeds
+- Background refresh of financial positions or market prices
+
+Historical CBC foreign-exchange reference-rate synchronization is an explicit exception.
+The first Issue #66 slice stores and serves those rates; later slices consume them during
+user-confirmed Snapshot capture. Synchronization never mutates a saved Snapshot or position.
 
 Manual entry is an intentional first integration. Automation may be added later only when it
 preserves provenance, reproducibility, and user trust.

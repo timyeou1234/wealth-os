@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ArchiveAssetData, ArchiveAssetErrors, ArchiveAssetResponses, ArchiveLiabilityData, ArchiveLiabilityErrors, ArchiveLiabilityResponses, CaptureSnapshotData, CaptureSnapshotErrors, CaptureSnapshotResponses, CreateAssetData, CreateAssetErrors, CreateAssetResponses, CreateLiabilityData, CreateLiabilityErrors, CreateLiabilityResponses, CreateSnapshotData, CreateSnapshotResponses, GetAssetData, GetAssetErrors, GetAssetResponses, GetFinancialHealthData, GetFinancialHealthResponses, GetLiabilityData, GetLiabilityErrors, GetLiabilityResponses, GetSnapshotData, GetSnapshotResponses, ListAssetsData, ListAssetsResponses, ListLiabilitiesData, ListLiabilitiesResponses, ListSnapshotsData, ListSnapshotsResponses, UpdateAssetData, UpdateAssetErrors, UpdateAssetResponses, UpdateLiabilityData, UpdateLiabilityErrors, UpdateLiabilityResponses } from './types.gen';
+import type { ArchiveAssetData, ArchiveAssetErrors, ArchiveAssetResponses, ArchiveLiabilityData, ArchiveLiabilityErrors, ArchiveLiabilityResponses, CaptureSnapshotData, CaptureSnapshotErrors, CaptureSnapshotResponses, CreateAssetData, CreateAssetErrors, CreateAssetResponses, CreateLiabilityData, CreateLiabilityErrors, CreateLiabilityResponses, CreateSnapshotData, CreateSnapshotResponses, GetAssetData, GetAssetErrors, GetAssetResponses, GetFinancialHealthData, GetFinancialHealthResponses, GetFxRatesData, GetFxRatesResponses, GetLiabilityData, GetLiabilityErrors, GetLiabilityResponses, GetSnapshotData, GetSnapshotResponses, ListAssetsData, ListAssetsResponses, ListLiabilitiesData, ListLiabilitiesResponses, ListSnapshotsData, ListSnapshotsResponses, SyncFxRatesData, SyncFxRatesResponses, UpdateAssetData, UpdateAssetErrors, UpdateAssetResponses, UpdateLiabilityData, UpdateLiabilityErrors, UpdateLiabilityResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -104,6 +104,18 @@ export const createLiability = <ThrowOnError extends boolean = false>(options: O
 export const archiveLiability = <ThrowOnError extends boolean = false>(options: Options<ArchiveLiabilityData, ThrowOnError>): RequestResult<ArchiveLiabilityResponses, ArchiveLiabilityErrors, ThrowOnError> => (options.client ?? client).post<ArchiveLiabilityResponses, ArchiveLiabilityErrors, ThrowOnError>({ url: '/api/v1/liabilities/{id}/archive', ...options });
 
 /**
+ * Synchronize CBC foreign-exchange rates
+ */
+export const syncFxRates = <ThrowOnError extends boolean = false>(options?: Options<SyncFxRatesData, ThrowOnError>): RequestResult<SyncFxRatesResponses, unknown, ThrowOnError> => (options?.client ?? client).post<SyncFxRatesResponses, unknown, ThrowOnError>({
+    url: '/api/v1/fx-rates/sync',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers
+    }
+});
+
+/**
  * List assets
  */
 export const listAssets = <ThrowOnError extends boolean = false>(options?: Options<ListAssetsData, ThrowOnError>): RequestResult<ListAssetsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListAssetsResponses, unknown, ThrowOnError>({ url: '/api/v1/assets', ...options });
@@ -129,6 +141,11 @@ export const archiveAsset = <ThrowOnError extends boolean = false>(options: Opti
  * Get a snapshot
  */
 export const getSnapshot = <ThrowOnError extends boolean = false>(options: Options<GetSnapshotData, ThrowOnError>): RequestResult<GetSnapshotResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetSnapshotResponses, unknown, ThrowOnError>({ url: '/api/v1/snapshots/{id}', ...options });
+
+/**
+ * Resolve TWD valuation rates on or before a date
+ */
+export const getFxRates = <ThrowOnError extends boolean = false>(options: Options<GetFxRatesData, ThrowOnError>): RequestResult<GetFxRatesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetFxRatesResponses, unknown, ThrowOnError>({ url: '/api/v1/fx-rates', ...options });
 
 /**
  * Get financial health for a snapshot
