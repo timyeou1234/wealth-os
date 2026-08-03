@@ -10,6 +10,7 @@ import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
+import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.snapshot.CorrectionReason
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotAssetPosition
@@ -42,6 +43,10 @@ internal object SnapshotPersistenceMapper {
                 currency = position.valuation.value.currency.code,
                 effectiveAt = position.valuation.effectiveAt,
                 source = position.valuation.source.value,
+                conversionOriginalAmount = position.valuation.manualConversion?.originalValue?.amount,
+                conversionOriginalCurrency = position.valuation.manualConversion?.originalValue?.currency?.code,
+                conversionExchangeRateBasis = position.valuation.manualConversion?.exchangeRateBasis,
+                conversionEffectiveAt = position.valuation.manualConversion?.effectiveAt,
             )
         }
 
@@ -58,6 +63,10 @@ internal object SnapshotPersistenceMapper {
                 currency = position.balance.balance.currency.code,
                 effectiveAt = position.balance.effectiveAt,
                 source = position.balance.source.value,
+                conversionOriginalAmount = position.balance.manualConversion?.originalValue?.amount,
+                conversionOriginalCurrency = position.balance.manualConversion?.originalValue?.currency?.code,
+                conversionExchangeRateBasis = position.balance.manualConversion?.exchangeRateBasis,
+                conversionEffectiveAt = position.balance.manualConversion?.effectiveAt,
             )
         }
 
@@ -94,6 +103,7 @@ internal object SnapshotPersistenceMapper {
                     value = Money.of(entity.amount, Currency.of(entity.currency)),
                     effectiveAt = entity.effectiveAt,
                     source = ValuationSource.of(entity.source),
+                    manualConversion = entity.manualConversion(),
                 ),
         )
     }
@@ -109,7 +119,26 @@ internal object SnapshotPersistenceMapper {
                     balance = Money.of(entity.amount, Currency.of(entity.currency)),
                     effectiveAt = entity.effectiveAt,
                     source = LiabilitySource.of(entity.source),
+                    manualConversion = entity.manualConversion(),
                 ),
         )
     }
+
+    private fun SnapshotAssetPositionJpaEntity.manualConversion(): ManualConversion? =
+        conversionOriginalAmount?.let { amount ->
+            ManualConversion.of(
+                originalValue = Money.of(amount, Currency.of(requireNotNull(conversionOriginalCurrency))),
+                exchangeRateBasis = requireNotNull(conversionExchangeRateBasis),
+                effectiveAt = requireNotNull(conversionEffectiveAt),
+            )
+        }
+
+    private fun SnapshotLiabilityPositionJpaEntity.manualConversion(): ManualConversion? =
+        conversionOriginalAmount?.let { amount ->
+            ManualConversion.of(
+                originalValue = Money.of(amount, Currency.of(requireNotNull(conversionOriginalCurrency))),
+                exchangeRateBasis = requireNotNull(conversionExchangeRateBasis),
+                effectiveAt = requireNotNull(conversionEffectiveAt),
+            )
+        }
 }

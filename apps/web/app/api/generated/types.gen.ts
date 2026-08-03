@@ -61,6 +61,7 @@ export type AssetFactRequest = {
     money: MoneyRequest;
     effectiveAt: string;
     source: string;
+    manualConversion?: ManualConversionRequest | null;
 };
 
 export type CreateSnapshotRequest = {
@@ -76,6 +77,13 @@ export type LiabilityFactRequest = {
     money: MoneyRequest;
     effectiveAt: string;
     source: string;
+    manualConversion?: ManualConversionRequest | null;
+};
+
+export type ManualConversionRequest = {
+    originalMoney: MoneyRequest;
+    exchangeRateBasis: string;
+    effectiveAt: string;
 };
 
 export type MoneyRequest = {
@@ -91,6 +99,7 @@ export type AssetFactResponse = {
     money?: MoneyResponse;
     effectiveAt?: string;
     source?: string;
+    manualConversion?: ManualConversionResponse | null;
 };
 
 export type LiabilityFactResponse = {
@@ -99,6 +108,13 @@ export type LiabilityFactResponse = {
     money?: MoneyResponse;
     effectiveAt?: string;
     source?: string;
+    manualConversion?: ManualConversionResponse | null;
+};
+
+export type ManualConversionResponse = {
+    originalMoney?: MoneyResponse;
+    exchangeRateBasis?: string;
+    effectiveAt?: string;
 };
 
 export type MoneyResponse = {
@@ -122,6 +138,7 @@ export type CaptureAssetRequest = {
     money: MoneyRequest;
     effectiveAt: string;
     source: string;
+    manualConversion?: ManualConversionRequest | null;
 };
 
 export type CaptureLiabilityRequest = {
@@ -130,6 +147,7 @@ export type CaptureLiabilityRequest = {
     money: MoneyRequest;
     effectiveAt: string;
     source: string;
+    manualConversion?: ManualConversionRequest | null;
 };
 
 export type CaptureSnapshotRequest = {

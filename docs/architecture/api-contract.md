@@ -47,6 +47,11 @@ browser from introducing binary rounding errors into financial values. `currency
 uppercase ISO 4217 currency code. Feature endpoints must not return a bare amount without
 its currency.
 
+Snapshot asset and liability facts may include `manualConversion` when their submitted
+value was manually converted to the selected base currency. It carries `originalMoney`,
+`exchangeRateBasis`, and `effectiveAt`; clients omit it for values already expressed in
+the base currency.
+
 ## Validation and errors
 
 - Invalid client input returns an appropriate `4xx` status and an

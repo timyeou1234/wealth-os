@@ -29,6 +29,12 @@ class Snapshot private constructor(
         require(this.liabilityPositions.all { !it.balance.effectiveAt.isAfter(asOf) }) {
             "Liability balance cannot be effective after the snapshot"
         }
+        require(this.assetPositions.all { it.valuation.manualConversion?.effectiveAt?.isAfter(asOf) != true }) {
+            "Asset manual conversion cannot be effective after the snapshot"
+        }
+        require(this.liabilityPositions.all { it.balance.manualConversion?.effectiveAt?.isAfter(asOf) != true }) {
+            "Liability manual conversion cannot be effective after the snapshot"
+        }
         require(this.assetPositions.map { it.assetId }.distinct().size == this.assetPositions.size) {
             "Snapshot must contain at most one position for each asset"
         }

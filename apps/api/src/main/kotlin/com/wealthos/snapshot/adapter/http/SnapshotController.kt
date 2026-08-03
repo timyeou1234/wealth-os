@@ -10,6 +10,7 @@ import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
+import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.snapshot.application.SnapshotApplication
@@ -65,9 +66,9 @@ data class CreateSnapshotRequest(
         return Snapshot.capture(
             id = SnapshotId.new(), asOf = asOf, recordedAt = recordedAt,
             assets = assets.mapIndexed { i, a -> com.wealthos.asset.domain.Asset(assetIds[i], a.name, a.type, a.liquidity) },
-            assetValuations = assets.mapIndexed { i, a -> AssetValuation(assetIds[i], Money.of(a.money.amount.toBigDecimal(), Currency.of(a.money.currency)), a.effectiveAt, ValuationSource.of(a.source)) },
+            assetValuations = assets.mapIndexed { i, a -> AssetValuation(assetIds[i], Money.of(a.money.amount.toBigDecimal(), Currency.of(a.money.currency)), a.effectiveAt, ValuationSource.of(a.source), a.manualConversion?.toDomain()) },
             liabilities = liabilities.mapIndexed { i, l -> com.wealthos.domain.liability.Liability(liabilityIds[i], l.name) },
-            liabilityBalances = liabilities.mapIndexed { i, l -> LiabilityBalance(liabilityIds[i], Money.of(l.money.amount.toBigDecimal(), Currency.of(l.money.currency)), l.effectiveAt, LiabilitySource.of(l.source)) },
+            liabilityBalances = liabilities.mapIndexed { i, l -> LiabilityBalance(liabilityIds[i], Money.of(l.money.amount.toBigDecimal(), Currency.of(l.money.currency)), l.effectiveAt, LiabilitySource.of(l.source), l.manualConversion?.toDomain()) },
         )
     }
 }
@@ -84,6 +85,7 @@ data class AssetFactRequest(
     @field:Valid @field:NotNull val money: MoneyRequest,
     @field:NotNull @field:Schema(example = "2026-08-01T00:00:00Z") val effectiveAt: Instant,
     @field:NotBlank @field:Schema(example = "bank") val source: String,
+    @field:Valid val manualConversion: ManualConversionRequest? = null,
 )
 data class LiabilityFactRequest(
     @field:Pattern(regexp = "^[0-9a-fA-F-]{36}$") @field:Schema(example = "0f27e4fa-99f8-4c5e-87da-527488cbe515") val id: String,
@@ -91,12 +93,25 @@ data class LiabilityFactRequest(
     @field:Valid @field:NotNull val money: MoneyRequest,
     @field:NotNull @field:Schema(example = "2026-08-01T00:00:00Z") val effectiveAt: Instant,
     @field:NotBlank @field:Schema(example = "bank") val source: String,
+    @field:Valid val manualConversion: ManualConversionRequest? = null,
 )
 data class SnapshotResponse(val id: String, val asOf: Instant, val recordedAt: Instant, val assets: List<AssetFactResponse>, val liabilities: List<LiabilityFactResponse>) {
     companion object {
-        fun from(s: Snapshot) = SnapshotResponse(s.id.value.toString(), s.asOf, s.recordedAt, s.assetPositions.map { AssetFactResponse(it.assetId.value.toString(), it.name, it.type, it.liquidity, MoneyResponse(it.valuation.value.amount.toPlainString(), it.valuation.value.currency.code), it.valuation.effectiveAt, it.valuation.source.value) }, s.liabilityPositions.map { LiabilityFactResponse(it.liabilityId.value.toString(), it.name, MoneyResponse(it.balance.balance.amount.toPlainString(), it.balance.balance.currency.code), it.balance.effectiveAt, it.balance.source.value) })
+        fun from(s: Snapshot) = SnapshotResponse(s.id.value.toString(), s.asOf, s.recordedAt, s.assetPositions.map { AssetFactResponse(it.assetId.value.toString(), it.name, it.type, it.liquidity, MoneyResponse(it.valuation.value.amount.toPlainString(), it.valuation.value.currency.code), it.valuation.effectiveAt, it.valuation.source.value, it.valuation.manualConversion?.let(ManualConversionResponse::from)) }, s.liabilityPositions.map { LiabilityFactResponse(it.liabilityId.value.toString(), it.name, MoneyResponse(it.balance.balance.amount.toPlainString(), it.balance.balance.currency.code), it.balance.effectiveAt, it.balance.source.value, it.balance.manualConversion?.let(ManualConversionResponse::from)) })
     }
 }
 data class MoneyResponse(val amount: String, val currency: String)
-data class AssetFactResponse(val id: String, val name: String, val type: AssetType, val liquidity: Liquidity, val money: MoneyResponse, val effectiveAt: Instant, val source: String)
-data class LiabilityFactResponse(val id: String, val name: String, val money: MoneyResponse, val effectiveAt: Instant, val source: String)
+data class ManualConversionResponse(val originalMoney: MoneyResponse, val exchangeRateBasis: String, val effectiveAt: Instant) {
+    companion object {
+        fun from(conversion: ManualConversion) = ManualConversionResponse(MoneyResponse(conversion.originalValue.amount.toPlainString(), conversion.originalValue.currency.code), conversion.exchangeRateBasis, conversion.effectiveAt)
+    }
+}
+data class AssetFactResponse(val id: String, val name: String, val type: AssetType, val liquidity: Liquidity, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null)
+data class LiabilityFactResponse(val id: String, val name: String, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null)
+
+private fun ManualConversionRequest.toDomain(): ManualConversion =
+    ManualConversion.of(
+        originalValue = Money.of(originalMoney.amount.toBigDecimal(), Currency.of(originalMoney.currency)),
+        exchangeRateBasis = exchangeRateBasis,
+        effectiveAt = effectiveAt,
+    )

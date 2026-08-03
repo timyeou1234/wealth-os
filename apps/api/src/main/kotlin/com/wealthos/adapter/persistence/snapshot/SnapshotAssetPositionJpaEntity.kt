@@ -32,6 +32,15 @@ class SnapshotAssetPositionJpaEntity(
     val effectiveAt: Instant,
     @Column(nullable = false, length = 100)
     val source: String,
+    @Column(name = "conversion_original_amount", precision = 38, scale = 3)
+    val conversionOriginalAmount: BigDecimal? = null,
+    @Column(name = "conversion_original_currency", columnDefinition = "char(3)")
+    @JdbcTypeCode(SqlTypes.CHAR)
+    val conversionOriginalCurrency: String? = null,
+    @Column(name = "conversion_exchange_rate_basis", length = 200)
+    val conversionExchangeRateBasis: String? = null,
+    @Column(name = "conversion_effective_at")
+    val conversionEffectiveAt: Instant? = null,
 )
 
 @Embeddable

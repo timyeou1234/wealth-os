@@ -6,6 +6,7 @@ export type AgentImportAsset = {
   amount: string;
   effectiveDate: string;
   source: string;
+  manualConversion?: AgentImportManualConversion;
 };
 
 export type AgentImportLiability = {
@@ -14,6 +15,14 @@ export type AgentImportLiability = {
   amount: string;
   effectiveDate: string;
   source: string;
+  manualConversion?: AgentImportManualConversion;
+};
+
+export type AgentImportManualConversion = {
+  originalAmount: string;
+  originalCurrency: string;
+  exchangeRateBasis: string;
+  effectiveDate: string;
 };
 
 export type AgentImport = {
@@ -51,17 +60,17 @@ export function parseAgentImport(input: string, knownAssetIds: Set<string>, know
   const rawLiabilities = array(root.liabilities, "liabilities");
   if (rawAssets.length + rawLiabilities.length > MAX_POSITIONS) throw new Error("Import cannot contain more than 500 positions.");
 
-  const assets = rawAssets.map((item, index) => parseAsset(item, index, knownAssetIds));
-  const liabilities = rawLiabilities.map((item, index) => parseLiability(item, index, knownLiabilityIds));
+  const assets = rawAssets.map((item, index) => parseAsset(item, index, knownAssetIds, baseCurrency));
+  const liabilities = rawLiabilities.map((item, index) => parseLiability(item, index, knownLiabilityIds, baseCurrency));
   duplicateIds(assets, "asset");
   duplicateIds(liabilities, "liability");
   return { schemaVersion: 1, baseCurrency, ...(snapshotDate ? { snapshotDate } : {}), assets, liabilities };
 }
 
-function parseAsset(value: unknown, index: number, knownIds: Set<string>): AgentImportAsset {
+function parseAsset(value: unknown, index: number, knownIds: Set<string>, baseCurrency: string): AgentImportAsset {
   const label = `assets[${index}]`;
   const item = object(value, label);
-  allow(item, ["id", "name", "type", "liquidity", "amount", "effectiveDate", "source"], label);
+  allow(item, ["id", "name", "type", "liquidity", "amount", "effectiveDate", "source", "manualConversion"], label);
   const id = optionalId(item.id, label, knownIds);
   const type = requiredString(item.type, `${label}.type`, 32);
   const liquidity = requiredString(item.liquidity, `${label}.liquidity`, 32);
@@ -75,13 +84,14 @@ function parseAsset(value: unknown, index: number, knownIds: Set<string>): Agent
     amount: amount(item.amount, `${label}.amount`),
     effectiveDate: requiredDate(item.effectiveDate, `${label}.effectiveDate`),
     source: requiredString(item.source, `${label}.source`, 100),
+    ...parseManualConversion(item.manualConversion, `${label}.manualConversion`, baseCurrency),
   };
 }
 
-function parseLiability(value: unknown, index: number, knownIds: Set<string>): AgentImportLiability {
+function parseLiability(value: unknown, index: number, knownIds: Set<string>, baseCurrency: string): AgentImportLiability {
   const label = `liabilities[${index}]`;
   const item = object(value, label);
-  allow(item, ["id", "name", "amount", "effectiveDate", "source"], label);
+  allow(item, ["id", "name", "amount", "effectiveDate", "source", "manualConversion"], label);
   const id = optionalId(item.id, label, knownIds);
   return {
     ...(id ? { id } : {}),
@@ -89,7 +99,23 @@ function parseLiability(value: unknown, index: number, knownIds: Set<string>): A
     amount: amount(item.amount, `${label}.amount`),
     effectiveDate: requiredDate(item.effectiveDate, `${label}.effectiveDate`),
     source: requiredString(item.source, `${label}.source`, 100),
+    ...parseManualConversion(item.manualConversion, `${label}.manualConversion`, baseCurrency),
   };
+}
+
+function parseManualConversion(value: unknown, label: string, baseCurrency: string): { manualConversion?: AgentImportManualConversion } {
+  if (value === undefined) return {};
+  const item = object(value, label);
+  allow(item, ["originalAmount", "originalCurrency", "exchangeRateBasis", "effectiveDate"], label);
+  const originalCurrency = requiredString(item.originalCurrency, `${label}.originalCurrency`, 3);
+  if (!/^[A-Z]{3}$/.test(originalCurrency)) throw new Error(`${label}.originalCurrency must be a three-letter uppercase currency code.`);
+  if (originalCurrency === baseCurrency) throw new Error(`${label}.originalCurrency must differ from baseCurrency.`);
+  return { manualConversion: {
+    originalAmount: amount(item.originalAmount, `${label}.originalAmount`),
+    originalCurrency,
+    exchangeRateBasis: requiredString(item.exchangeRateBasis, `${label}.exchangeRateBasis`, 200),
+    effectiveDate: requiredDate(item.effectiveDate, `${label}.effectiveDate`),
+  } };
 }
 
 function unwrap(input: string): string {

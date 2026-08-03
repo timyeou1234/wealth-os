@@ -46,14 +46,24 @@ class SnapshotCaptureControllerTest {
                         "liquidity":"SEMI_LIQUID",
                         "money":{"amount":"1250.00","currency":"USD"},
                         "effectiveAt":"2026-08-01T00:00:00Z",
-                        "source":"Bank statement"
+                        "source":"Bank statement",
+                        "manualConversion":{
+                          "originalMoney":{"amount":"1000.00","currency":"EUR"},
+                          "exchangeRateBasis":"ECB EUR/USD reference rate 1.25",
+                          "effectiveAt":"2026-08-01T00:00:00Z"
+                        }
                       }],
                       "liabilities":[{
                         "id":"$liabilityId",
                         "name":"Home loan",
                         "money":{"amount":"400.00","currency":"USD"},
                         "effectiveAt":"2026-08-01T00:00:00Z",
-                        "source":"Lender statement"
+                        "source":"Lender statement",
+                        "manualConversion":{
+                          "originalMoney":{"amount":"320.00","currency":"EUR"},
+                          "exchangeRateBasis":"ECB EUR/USD reference rate 1.25",
+                          "effectiveAt":"2026-08-01T00:00:00Z"
+                        }
                       }]
                     }
                     """.trimIndent()
@@ -63,15 +73,23 @@ class SnapshotCaptureControllerTest {
                 jsonPath("$.assets[0].id") { value(assetId) }
                 jsonPath("$.assets[0].name") { value("Emergency fund") }
                 jsonPath("$.assets[0].money.amount") { value("1250.00") }
+                jsonPath("$.assets[0].manualConversion.originalMoney.amount") { value("1000.00") }
+                jsonPath("$.assets[0].manualConversion.originalMoney.currency") { value("EUR") }
+                jsonPath("$.assets[0].manualConversion.exchangeRateBasis") { value("ECB EUR/USD reference rate 1.25") }
+                jsonPath("$.assets[0].manualConversion.effectiveAt") { value("2026-08-01T00:00:00Z") }
                 jsonPath("$.liabilities[0].id") { value(liabilityId) }
                 jsonPath("$.liabilities[0].name") { value("Home loan") }
+                jsonPath("$.liabilities[0].manualConversion.originalMoney.amount") { value("320.00") }
             }.andReturn()
 
         mockMvc.get(requireNotNull(capture.response.getHeader("Location")))
             .andExpect {
                 status { isOk() }
                 jsonPath("$.assets[0].name") { value("Emergency fund") }
+                jsonPath("$.assets[0].manualConversion.originalMoney.currency") { value("EUR") }
+                jsonPath("$.assets[0].manualConversion.exchangeRateBasis") { value("ECB EUR/USD reference rate 1.25") }
                 jsonPath("$.liabilities[0].name") { value("Home loan") }
+                jsonPath("$.liabilities[0].manualConversion.originalMoney.amount") { value("320.00") }
             }
         mockMvc.get("/api/v1/assets/$assetId")
             .andExpect {
@@ -124,6 +142,95 @@ class SnapshotCaptureControllerTest {
                 status { isOk() }
                 jsonPath("$[0].name") { value("Mortgage") }
             }
+    }
+
+    @Test
+    fun `capture rejects a manual conversion from the base currency`() {
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-02T00:00:00Z",
+                  "recordedAt":"2026-08-02T08:00:00Z",
+                  "baseCurrency":"USD",
+                  "assets":[{
+                    "name":"Cash","type":"CASH","liquidity":"LIQUID",
+                    "money":{"amount":"1250.00","currency":"USD"},
+                    "effectiveAt":"2026-08-01T00:00:00Z","source":"Bank statement",
+                    "manualConversion":{
+                      "originalMoney":{"amount":"1000.00","currency":"USD"},
+                      "exchangeRateBasis":"Declared rate 1.25",
+                      "effectiveAt":"2026-08-01T00:00:00Z"
+                    }
+                  }],
+                  "liabilities":[]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets[0].manualConversion.originalMoney.currency") }
+            jsonPath("$.errors[0].message") { value("must differ from baseCurrency") }
+        }
+    }
+
+    @Test
+    fun `capture rejects a manual conversion effective after the snapshot`() {
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-02T00:00:00Z",
+                  "recordedAt":"2026-08-02T08:00:00Z",
+                  "baseCurrency":"USD",
+                  "assets":[{
+                    "name":"Cash","type":"CASH","liquidity":"LIQUID",
+                    "money":{"amount":"1250.00","currency":"USD"},
+                    "effectiveAt":"2026-08-01T00:00:00Z","source":"Bank statement",
+                    "manualConversion":{
+                      "originalMoney":{"amount":"1000.00","currency":"EUR"},
+                      "exchangeRateBasis":"Declared rate 1.25",
+                      "effectiveAt":"2026-08-03T00:00:00Z"
+                    }
+                  }],
+                  "liabilities":[]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets[0].manualConversion.effectiveAt") }
+            jsonPath("$.errors[0].message") { value("must not be after asOf") }
+        }
+    }
+
+    @Test
+    fun `capture rejects a blank exchange-rate basis`() {
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-02T00:00:00Z",
+                  "recordedAt":"2026-08-02T08:00:00Z",
+                  "baseCurrency":"USD",
+                  "assets":[{
+                    "name":"Cash","type":"CASH","liquidity":"LIQUID",
+                    "money":{"amount":"1250.00","currency":"USD"},
+                    "effectiveAt":"2026-08-01T00:00:00Z","source":"Bank statement",
+                    "manualConversion":{
+                      "originalMoney":{"amount":"1000.00","currency":"EUR"},
+                      "exchangeRateBasis":" ",
+                      "effectiveAt":"2026-08-01T00:00:00Z"
+                    }
+                  }],
+                  "liabilities":[]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets[0].manualConversion.exchangeRateBasis") }
+        }
     }
 
     @Test

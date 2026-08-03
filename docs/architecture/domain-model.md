@@ -55,6 +55,10 @@ so those values are modeled as separate facts rather than mutable entity fields.
 - Values supplied to snapshot calculations are already expressed in that base currency.
 - A manually converted value records the original amount, exchange-rate basis, and
   effective time in its provenance.
+- `ManualConversion` stores that provenance as an optional structured value containing
+  the original `Money`, a human-readable exchange-rate basis, and its effective time.
+  The valuation or balance remains expressed in the Snapshot base currency; Wealth OS
+  records but does not calculate the manual conversion.
 - Automatic foreign-exchange conversion is deferred. Mixed-currency facts produce an
   explicit insufficient-data result rather than implicit conversion.
 

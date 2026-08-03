@@ -13,6 +13,7 @@ import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilityRepository
 import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
+import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
@@ -57,14 +58,14 @@ class CaptureSnapshot(
                 assets = capturedAssets,
                 assetValuations =
                     capturedAssets.zip(command.assets).mapIndexed { index, (asset, input) ->
-                        validateFact(input.money, input.effectiveAt, command, "assets[$index]")
-                        AssetValuation(asset.id, input.money, input.effectiveAt, input.source)
+                        validateFact(input.money, input.effectiveAt, input.manualConversion, command, "assets[$index]")
+                        AssetValuation(asset.id, input.money, input.effectiveAt, input.source, input.manualConversion)
                     },
                 liabilities = capturedLiabilities,
                 liabilityBalances =
                     capturedLiabilities.zip(command.liabilities).mapIndexed { index, (liability, input) ->
-                        validateFact(input.money, input.effectiveAt, command, "liabilities[$index]")
-                        LiabilityBalance(liability.id, input.money, input.effectiveAt, input.source)
+                        validateFact(input.money, input.effectiveAt, input.manualConversion, command, "liabilities[$index]")
+                        LiabilityBalance(liability.id, input.money, input.effectiveAt, input.source, input.manualConversion)
                     },
             )
         return snapshots.save(snapshot)
@@ -107,6 +108,7 @@ class CaptureSnapshot(
     private fun validateFact(
         money: Money,
         effectiveAt: Instant,
+        manualConversion: ManualConversion?,
         command: CaptureSnapshotCommand,
         field: String,
     ) {
@@ -118,6 +120,18 @@ class CaptureSnapshot(
         }
         if (effectiveAt.isAfter(command.asOf)) {
             throw RequestValidationException("$field.effectiveAt", "must not be after asOf")
+        }
+        if (manualConversion?.originalValue?.currency == command.baseCurrency) {
+            throw RequestValidationException(
+                "$field.manualConversion.originalMoney.currency",
+                "must differ from baseCurrency",
+            )
+        }
+        if (manualConversion?.effectiveAt?.isAfter(command.asOf) == true) {
+            throw RequestValidationException(
+                "$field.manualConversion.effectiveAt",
+                "must not be after asOf",
+            )
         }
     }
 }
@@ -138,6 +152,7 @@ data class CaptureAsset(
     val money: Money,
     val effectiveAt: Instant,
     val source: ValuationSource,
+    val manualConversion: ManualConversion?,
 )
 
 data class CaptureLiability(
@@ -146,4 +161,5 @@ data class CaptureLiability(
     val money: Money,
     val effectiveAt: Instant,
     val source: LiabilitySource,
+    val manualConversion: ManualConversion?,
 )

@@ -8,6 +8,7 @@ import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
+import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.snapshot.application.CaptureAsset
 import com.wealthos.snapshot.application.CaptureLiability
 import com.wealthos.snapshot.application.CaptureSnapshot
@@ -83,6 +84,7 @@ data class CaptureAssetRequest(
     @field:Valid @field:NotNull val money: MoneyRequest,
     @field:NotNull val effectiveAt: Instant,
     @field:NotBlank @field:Size(max = 100) val source: String,
+    @field:Valid val manualConversion: ManualConversionRequest? = null,
 ) {
     fun toCommand(baseCurrency: Currency, index: Int): CaptureAsset =
         CaptureAsset(
@@ -93,6 +95,7 @@ data class CaptureAssetRequest(
             money = money.toDomain(baseCurrency, "assets[$index].money"),
             effectiveAt = effectiveAt,
             source = validated("assets[$index].source", "must contain at most 100 characters") { ValuationSource.of(source) },
+            manualConversion = manualConversion?.toDomain("assets[$index].manualConversion"),
         )
 }
 
@@ -102,6 +105,7 @@ data class CaptureLiabilityRequest(
     @field:Valid @field:NotNull val money: MoneyRequest,
     @field:NotNull val effectiveAt: Instant,
     @field:NotBlank @field:Size(max = 100) val source: String,
+    @field:Valid val manualConversion: ManualConversionRequest? = null,
 ) {
     fun toCommand(baseCurrency: Currency, index: Int): CaptureLiability =
         CaptureLiability(
@@ -110,7 +114,23 @@ data class CaptureLiabilityRequest(
             money = money.toDomain(baseCurrency, "liabilities[$index].money"),
             effectiveAt = effectiveAt,
             source = validated("liabilities[$index].source", "must contain at most 100 characters") { LiabilitySource.of(source) },
+            manualConversion = manualConversion?.toDomain("liabilities[$index].manualConversion"),
         )
+}
+
+data class ManualConversionRequest(
+    @field:Valid @field:NotNull val originalMoney: MoneyRequest,
+    @field:NotBlank @field:Size(max = 200) val exchangeRateBasis: String,
+    @field:NotNull val effectiveAt: Instant,
+) {
+    fun toDomain(field: String): ManualConversion =
+        validated(field, "contains invalid values") {
+            ManualConversion.of(
+                originalValue = originalMoney.toDomain("$field.originalMoney"),
+                exchangeRateBasis = exchangeRateBasis,
+                effectiveAt = effectiveAt,
+            )
+        }
 }
 
 private fun MoneyRequest.toDomain(baseCurrency: Currency, field: String): Money {
@@ -120,6 +140,16 @@ private fun MoneyRequest.toDomain(baseCurrency: Currency, field: String): Money 
     }
     return validated("$field.amount", "must use the currency's supported precision") {
         Money.of(amount.toBigDecimal(), baseCurrency)
+    }
+}
+
+private fun MoneyRequest.toDomain(field: String): Money {
+    val validatedCurrency = validated("$field.currency", "must be a supported ISO 4217 currency") { Currency.of(currency) }
+    if (!amount.matches(Regex("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))) {
+        throw RequestValidationException("$field.amount", "must be a decimal string")
+    }
+    return validated("$field.amount", "must use the currency's supported precision") {
+        Money.of(amount.toBigDecimal(), validatedCurrency)
     }
 }
 

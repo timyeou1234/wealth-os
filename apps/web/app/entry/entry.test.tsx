@@ -90,6 +90,8 @@ describe("Balance-sheet entry", () => {
     expect(prompt.value).toContain("Other assets");
     expect(prompt.value).toContain("Mortgages, credit cards, personal or business loans, taxes owed, and other liabilities");
     expect(prompt.value).toContain("Do not return the final JSON until the user confirms the inventory is complete");
+    expect(prompt.value).toContain("For each foreign-currency position, manually convert it to the base currency");
+    expect(prompt.value).toContain('"manualConversion"');
     fireEvent.click(screen.getByLabelText("Include current draft in Prompt"));
     expect(prompt.value).toContain(assetId);
     expect(screen.getByText("This Prompt contains sensitive financial data.")).toBeTruthy();
@@ -104,7 +106,11 @@ describe("Balance-sheet entry", () => {
     "amount": "1200.00", "effectiveDate": "2026-08-02", "source": "New bank statement"
   }],
   "liabilities": [{
-    "name": "Mortgage", "amount": "400.00", "effectiveDate": "2026-08-02", "source": "Lender statement"
+    "name": "Mortgage", "amount": "400.00", "effectiveDate": "2026-08-02", "source": "Lender statement",
+    "manualConversion": {
+      "originalAmount": "320.00", "originalCurrency": "EUR",
+      "exchangeRateBasis": "ECB EUR/USD reference rate 1.25", "effectiveDate": "2026-08-01"
+    }
   }]
 }
 \`\`\`` } });
@@ -121,6 +127,8 @@ describe("Balance-sheet entry", () => {
     expect((screen.getByLabelText("Updated cash amount") as HTMLInputElement).value).toBe("1200.00");
     fireEvent.click(screen.getByRole("button", { name: "Liabilities" }));
     expect(screen.getByRole("group", { name: "New liability" })).toBeTruthy();
+    expect((screen.getByLabelText("New liability original amount") as HTMLInputElement).value).toBe("320.00");
+    expect((screen.getByLabelText("New liability original currency") as HTMLInputElement).value).toBe("EUR");
     expect(api.captureSnapshot).not.toHaveBeenCalled();
   });
 
@@ -287,6 +295,53 @@ describe("Balance-sheet entry", () => {
 
     expect(await screen.findByText("Assets must include every active asset exactly once.")).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add asset" })));
+  });
+
+  it("captures structured manual-conversion provenance for a foreign-currency asset", async () => {
+    render(<EntryPage />);
+
+    await screen.findByRole("heading", { name: "Update balance sheet" });
+    fireEvent.click(screen.getByRole("button", { name: "Assets" }));
+    fireEvent.click(screen.getByLabelText("Cash converted from another currency"));
+    fireEvent.change(screen.getByLabelText("Cash original amount"), { target: { value: "800.00" } });
+    fireEvent.change(screen.getByLabelText("Cash original currency"), { target: { value: "EUR" } });
+    fireEvent.change(screen.getByLabelText("Cash exchange-rate basis"), { target: { value: "ECB EUR/USD reference rate 1.25" } });
+    fireEvent.change(screen.getByLabelText("Cash conversion effective date"), { target: { value: "2026-07-30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
+
+    await waitFor(() => expect(api.captureSnapshot).toHaveBeenCalledOnce());
+    expect(api.captureSnapshot.mock.calls[0][0].body.assets[0].manualConversion).toEqual({
+      originalMoney: { amount: "800.00", currency: "EUR" },
+      exchangeRateBasis: "ECB EUR/USD reference rate 1.25",
+      effectiveAt: "2026-07-30T00:00:00.000Z",
+    });
+  });
+
+  it("carries forward saved manual-conversion provenance", async () => {
+    api.getSnapshot.mockResolvedValue({ data: {
+      id: "snapshot-1",
+      asOf: "2026-07-31T00:00:00Z",
+      recordedAt: "2026-07-31T08:00:00Z",
+      assets: [{
+        id: assetId, name: "Cash", type: "CASH", liquidity: "LIQUID",
+        money: { amount: "1250.00", currency: "USD" }, effectiveAt: "2026-07-30T00:00:00Z", source: "Bank statement",
+        manualConversion: {
+          originalMoney: { amount: "1000.00", currency: "EUR" },
+          exchangeRateBasis: "ECB EUR/USD reference rate 1.25",
+          effectiveAt: "2026-07-30T00:00:00Z",
+        },
+      }],
+      liabilities: [],
+    } });
+    render(<EntryPage />);
+
+    await screen.findByRole("heading", { name: "Update balance sheet" });
+    fireEvent.click(screen.getByRole("button", { name: "Assets" }));
+
+    expect((screen.getByLabelText("Cash converted from another currency") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Cash original amount") as HTMLInputElement).value).toBe("1000.00");
+    expect((screen.getByLabelText("Cash original currency") as HTMLInputElement).value).toBe("EUR");
   });
 
   it("prefills the latest facts and captures all active positions with a new asset", async () => {
