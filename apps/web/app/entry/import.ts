@@ -40,6 +40,11 @@ const DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ASSET_TYPES = new Set(["CASH", "INVESTMENT", "REAL_ESTATE", "VEHICLE", "BUSINESS", "OTHER"]);
 const LIQUIDITIES = new Set(["LIQUID", "SEMI_LIQUID", "ILLIQUID"]);
+const SUPPORTED_CURRENCIES = new Set(Intl.supportedValuesOf("currency"));
+
+export function isSupportedCurrency(value: string): boolean {
+  return /^[A-Z]{3}$/.test(value) && SUPPORTED_CURRENCIES.has(value);
+}
 
 export function parseAgentImport(input: string, knownAssetIds: Set<string>, knownLiabilityIds: Set<string>): AgentImport {
   if (new TextEncoder().encode(input).byteLength > MAX_BYTES) throw new Error("Import is larger than 256 KB and is not allowed.");
@@ -55,6 +60,7 @@ export function parseAgentImport(input: string, knownAssetIds: Set<string>, know
   if (root.schemaVersion !== 1) throw new Error("schemaVersion must be 1.");
   const baseCurrency = requiredString(root.baseCurrency, "baseCurrency", 3);
   if (!/^[A-Z]{3}$/.test(baseCurrency)) throw new Error("baseCurrency must be a three-letter uppercase currency code.");
+  if (!isSupportedCurrency(baseCurrency)) throw new Error("baseCurrency must be a supported ISO 4217 currency.");
   const snapshotDate = optionalDate(root.snapshotDate, "snapshotDate");
   const rawAssets = array(root.assets, "assets");
   const rawLiabilities = array(root.liabilities, "liabilities");
@@ -109,6 +115,7 @@ function parseManualConversion(value: unknown, label: string, baseCurrency: stri
   allow(item, ["originalAmount", "originalCurrency", "exchangeRateBasis", "effectiveDate"], label);
   const originalCurrency = requiredString(item.originalCurrency, `${label}.originalCurrency`, 3);
   if (!/^[A-Z]{3}$/.test(originalCurrency)) throw new Error(`${label}.originalCurrency must be a three-letter uppercase currency code.`);
+  if (!isSupportedCurrency(originalCurrency)) throw new Error(`${label}.originalCurrency must be a supported ISO 4217 currency.`);
   if (originalCurrency === baseCurrency) throw new Error(`${label}.originalCurrency must differ from baseCurrency.`);
   return { manualConversion: {
     originalAmount: amount(item.originalAmount, `${label}.originalAmount`),

@@ -5,7 +5,7 @@ import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "re
 import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
 import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
 import { AppNavigation } from "../app-navigation";
-import { parseAgentImport } from "./import";
+import { isSupportedCurrency, parseAgentImport } from "./import";
 import type { AgentImport, AgentImportAsset, AgentImportLiability, AgentImportManualConversion } from "./import";
 
 type AssetType = CaptureAssetRequest["type"];
@@ -53,7 +53,6 @@ const displayDate = (value: string) => new Intl.DateTimeFormat("en-US", { dateSt
 const assetTypes = ["CASH", "INVESTMENT", "REAL_ESTATE", "VEHICLE", "BUSINESS", "OTHER"] as const;
 const liquidities = ["LIQUID", "SEMI_LIQUID", "ILLIQUID"] as const;
 const decimal = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
-const currencyCode = /^[A-Z]{3}$/;
 
 export default function EntryPage() {
   const router = useRouter();
@@ -185,7 +184,7 @@ export default function EntryPage() {
 
   const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
   const baseCurrencyLocked = hasMonetaryFacts(assets, liabilities);
-  const settingsComplete = Boolean(snapshotDate && currencyCode.test(baseCurrency));
+  const settingsComplete = Boolean(snapshotDate && isSupportedCurrency(baseCurrency));
   const assetsComplete = validAssets(assets, snapshotDate, baseCurrency);
   const liabilitiesComplete = validLiabilities(liabilities, snapshotDate, baseCurrency);
 
@@ -267,7 +266,7 @@ export default function EntryPage() {
           <div className="step-heading"><p className="eyebrow">Shared settings</p><h2 id="snapshot-context-title">Snapshot context</h2><p>These values apply to both AI-assisted import and manual entry.</p></div>
           <div className="entry-settings">
             <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} readOnly={baseCurrencyLocked} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
+            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !isSupportedCurrency(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} readOnly={baseCurrencyLocked} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !isSupportedCurrency(baseCurrency) && <span className="field-error">Base currency must be a supported ISO 4217 currency.</span>}</label>
           </div>
         </section>
 
@@ -440,7 +439,7 @@ function LiabilityFields({ index, draft, isNew, snapshotDate, baseCurrency, show
 
 function ManualConversionFields({ label, apiField, value, baseCurrency, snapshotDate, showValidation, onChange }: { label: string; apiField: string; value?: ManualConversionDraft; baseCurrency: string; snapshotDate: string; showValidation: boolean; onChange: (value?: ManualConversionDraft) => void }) {
   const invalidAmount = showValidation && value && !decimal.test(value.originalAmount);
-  const invalidCurrency = showValidation && value && (!currencyCode.test(value.originalCurrency) || value.originalCurrency === baseCurrency);
+  const invalidCurrency = showValidation && value && (!isSupportedCurrency(value.originalCurrency) || value.originalCurrency === baseCurrency);
   const invalidBasis = showValidation && value && !value.exchangeRateBasis.trim();
   const invalidDate = showValidation && value && (!value.effectiveDate || value.effectiveDate > snapshotDate);
   return <div className="manual-conversion">
@@ -452,7 +451,7 @@ function ManualConversionFields({ label, apiField, value, baseCurrency, snapshot
     />Converted from another currency</label>
     {value && <div className="manual-conversion-fields">
       <label>Original amount<input data-api-field={`${apiField}.originalMoney.amount`} aria-label={`${label} original amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={value.originalAmount} onChange={(event) => onChange({ ...value, originalAmount: event.target.value })} required />{invalidAmount && <span className="field-error">Original amount must be a non-negative decimal.</span>}</label>
-      <label>Original currency<input data-api-field={`${apiField}.originalMoney.currency`} aria-label={`${label} original currency`} aria-invalid={invalidCurrency || undefined} value={value.originalCurrency} onChange={(event) => onChange({ ...value, originalCurrency: event.target.value.toUpperCase() })} maxLength={3} pattern="[A-Z]{3}" required />{invalidCurrency && <span className="field-error">Original currency must be a three-letter code different from the base currency.</span>}</label>
+      <label>Original currency<input data-api-field={`${apiField}.originalMoney.currency`} aria-label={`${label} original currency`} aria-invalid={invalidCurrency || undefined} value={value.originalCurrency} onChange={(event) => onChange({ ...value, originalCurrency: event.target.value.toUpperCase() })} maxLength={3} pattern="[A-Z]{3}" required />{invalidCurrency && <span className="field-error">Original currency must be a supported ISO 4217 code different from the base currency.</span>}</label>
       <label>Exchange-rate basis<input data-api-field={`${apiField}.exchangeRateBasis`} aria-label={`${label} exchange-rate basis`} aria-invalid={invalidBasis || undefined} value={value.exchangeRateBasis} onChange={(event) => onChange({ ...value, exchangeRateBasis: event.target.value })} maxLength={200} required />{invalidBasis && <span className="field-error">Exchange-rate basis is required.</span>}</label>
       <label>Conversion effective date<input data-api-field={`${apiField}.effectiveAt`} aria-label={`${label} conversion effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={value.effectiveDate} onChange={(event) => onChange({ ...value, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Conversion effective date is required and cannot be after the Snapshot date.</span>}</label>
     </div>}
@@ -531,7 +530,7 @@ function describeManualConversion(value?: ManualConversionDraft | AgentImportMan
 }
 
 function validConversion(value: ManualConversionDraft | undefined, snapshotDate: string, baseCurrency: string): boolean {
-  return !value || Boolean(decimal.test(value.originalAmount) && currencyCode.test(value.originalCurrency) && value.originalCurrency !== baseCurrency && value.exchangeRateBasis.trim() && value.effectiveDate && value.effectiveDate <= snapshotDate);
+  return !value || Boolean(decimal.test(value.originalAmount) && isSupportedCurrency(value.originalCurrency) && value.originalCurrency !== baseCurrency && value.exchangeRateBasis.trim() && value.effectiveDate && value.effectiveDate <= snapshotDate);
 }
 
 function stepForApiField(field: string): EntryStep {
@@ -582,12 +581,14 @@ function mergeLiabilities(current: LiabilityDraft[], imported: AgentImport, next
 }
 
 function buildPrompt(includeDraft: boolean, snapshotDate: string, baseCurrency: string, assets: AssetDraft[], liabilities: LiabilityDraft[]): string {
-  const contextReady = currencyCode.test(baseCurrency) && Boolean(snapshotDate);
+  const contextReady = isSupportedCurrency(baseCurrency) && Boolean(snapshotDate);
+  const exampleBaseCurrency = contextReady ? baseCurrency : "TWD";
+  const exampleOriginalCurrency = exampleBaseCurrency === "USD" ? "EUR" : "USD";
   const shape = {
     schemaVersion: 1,
-    baseCurrency: contextReady ? baseCurrency : "TWD",
+    baseCurrency: exampleBaseCurrency,
     snapshotDate: snapshotDate || "YYYY-MM-DD",
-    assets: [{ name: "Example foreign-currency asset", type: "CASH", liquidity: "LIQUID", amount: "31250.00", effectiveDate: snapshotDate, source: "Statement description", manualConversion: { originalAmount: "1000.00", originalCurrency: "USD", exchangeRateBasis: "Declared USD/TWD rate 31.25", effectiveDate: snapshotDate } }],
+    assets: [{ name: "Example foreign-currency asset", type: "CASH", liquidity: "LIQUID", amount: "1250.00", effectiveDate: snapshotDate, source: "Statement description", manualConversion: { originalAmount: "1000.00", originalCurrency: exampleOriginalCurrency, exchangeRateBasis: `Declared ${exampleOriginalCurrency}/${exampleBaseCurrency} rate 1.25`, effectiveDate: snapshotDate } }],
     liabilities: [{ name: "Example liability", amount: "250.00", effectiveDate: snapshotDate, source: "Statement description" }],
   };
   const instructions = [

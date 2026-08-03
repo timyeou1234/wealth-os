@@ -102,8 +102,10 @@ describe("Balance-sheet entry", () => {
 
     const prompt = await screen.findByLabelText("AI Prompt") as HTMLTextAreaElement;
     expect(prompt.value).toContain("Set a valid Base currency in Wealth OS before using this Prompt.");
-    fireEvent.change(screen.getByLabelText("Base currency"), { target: { value: "TWD" } });
     fireEvent.change(screen.getByLabelText("Snapshot date"), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByLabelText("Base currency"), { target: { value: "ZZZ" } });
+    expect(prompt.value).toContain("Set a valid Base currency in Wealth OS before using this Prompt.");
+    fireEvent.change(screen.getByLabelText("Base currency"), { target: { value: "TWD" } });
 
     expect(prompt.value).toContain("Use this exact Snapshot context: Base currency TWD; Snapshot date 2026-08-01.");
     expect(prompt.value).toContain('"baseCurrency": "TWD"');
@@ -144,6 +146,8 @@ describe("Balance-sheet entry", () => {
     expect(prompt.value).not.toContain(assetId);
     expect(prompt.value).not.toContain("Bank statement");
     expect(prompt.value).toContain('"baseCurrency": "USD"');
+    expect(prompt.value).toContain('"originalCurrency": "EUR"');
+    expect(prompt.value).not.toContain('"originalCurrency": "USD"');
     expect(prompt.value).toContain("Use this exact Snapshot context: Base currency USD; Snapshot date 2026-08-02.");
     expect(prompt.value).toContain("Ask one concise question at a time and wait for the user's answer");
     expect(prompt.value).toContain("Cash and bank accounts");
@@ -331,6 +335,53 @@ describe("Balance-sheet entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
     expect((await screen.findByRole("alert")).textContent).toContain("baseCurrency is required");
+    expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
+  });
+
+  it("rejects an unsupported ISO base currency in agent output", async () => {
+    render(<EntryPage />);
+    await screen.findByLabelText("Agent JSON");
+
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
+      "schemaVersion": 1,
+      "baseCurrency": "ZZZ",
+      "snapshotDate": "2026-08-02",
+      "assets": [],
+      "liabilities": []
+    }` } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("baseCurrency must be a supported ISO 4217 currency");
+    expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
+  });
+
+  it("rejects an unsupported ISO original currency in agent output", async () => {
+    render(<EntryPage />);
+    await screen.findByLabelText("Agent JSON");
+
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
+      "schemaVersion": 1,
+      "baseCurrency": "USD",
+      "snapshotDate": "2026-08-02",
+      "assets": [{
+        "name": "Foreign cash",
+        "type": "CASH",
+        "liquidity": "LIQUID",
+        "amount": "100.00",
+        "effectiveDate": "2026-08-02",
+        "source": "Statement",
+        "manualConversion": {
+          "originalAmount": "100.00",
+          "originalCurrency": "ZZZ",
+          "exchangeRateBasis": "Declared rate",
+          "effectiveDate": "2026-08-02"
+        }
+      }],
+      "liabilities": []
+    }` } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("assets[0].manualConversion.originalCurrency must be a supported ISO 4217 currency");
     expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
   });
 
