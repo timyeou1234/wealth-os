@@ -1,5 +1,5 @@
 alter table snapshot_asset_positions
-    add column conversion_original_amount numeric(38, 3);
+    add column conversion_original_amount numeric(38, 6);
 alter table snapshot_asset_positions
     add column conversion_original_currency char(3);
 alter table snapshot_asset_positions
@@ -23,7 +23,7 @@ alter table snapshot_asset_positions
     );
 
 alter table snapshot_liability_positions
-    add column conversion_original_amount numeric(38, 3);
+    add column conversion_original_amount numeric(38, 6);
 alter table snapshot_liability_positions
     add column conversion_original_currency char(3);
 alter table snapshot_liability_positions

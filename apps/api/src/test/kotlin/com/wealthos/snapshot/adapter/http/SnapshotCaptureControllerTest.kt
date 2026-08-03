@@ -48,8 +48,8 @@ class SnapshotCaptureControllerTest {
                         "effectiveAt":"2026-08-01T00:00:00Z",
                         "source":"Bank statement",
                         "manualConversion":{
-                          "originalMoney":{"amount":"1000.00","currency":"EUR"},
-                          "exchangeRateBasis":"ECB EUR/USD reference rate 1.25",
+                          "originalMoney":{"amount":"12.3456","currency":"CLF"},
+                          "exchangeRateBasis":"Declared CLF/USD basis",
                           "effectiveAt":"2026-08-01T00:00:00Z"
                         }
                       }],
@@ -73,9 +73,9 @@ class SnapshotCaptureControllerTest {
                 jsonPath("$.assets[0].id") { value(assetId) }
                 jsonPath("$.assets[0].name") { value("Emergency fund") }
                 jsonPath("$.assets[0].money.amount") { value("1250.00") }
-                jsonPath("$.assets[0].manualConversion.originalMoney.amount") { value("1000.00") }
-                jsonPath("$.assets[0].manualConversion.originalMoney.currency") { value("EUR") }
-                jsonPath("$.assets[0].manualConversion.exchangeRateBasis") { value("ECB EUR/USD reference rate 1.25") }
+                jsonPath("$.assets[0].manualConversion.originalMoney.amount") { value("12.3456") }
+                jsonPath("$.assets[0].manualConversion.originalMoney.currency") { value("CLF") }
+                jsonPath("$.assets[0].manualConversion.exchangeRateBasis") { value("Declared CLF/USD basis") }
                 jsonPath("$.assets[0].manualConversion.effectiveAt") { value("2026-08-01T00:00:00Z") }
                 jsonPath("$.liabilities[0].id") { value(liabilityId) }
                 jsonPath("$.liabilities[0].name") { value("Home loan") }
@@ -86,8 +86,9 @@ class SnapshotCaptureControllerTest {
             .andExpect {
                 status { isOk() }
                 jsonPath("$.assets[0].name") { value("Emergency fund") }
-                jsonPath("$.assets[0].manualConversion.originalMoney.currency") { value("EUR") }
-                jsonPath("$.assets[0].manualConversion.exchangeRateBasis") { value("ECB EUR/USD reference rate 1.25") }
+                jsonPath("$.assets[0].manualConversion.originalMoney.amount") { value("12.3456") }
+                jsonPath("$.assets[0].manualConversion.originalMoney.currency") { value("CLF") }
+                jsonPath("$.assets[0].manualConversion.exchangeRateBasis") { value("Declared CLF/USD basis") }
                 jsonPath("$.liabilities[0].name") { value("Home loan") }
                 jsonPath("$.liabilities[0].manualConversion.originalMoney.amount") { value("320.00") }
             }

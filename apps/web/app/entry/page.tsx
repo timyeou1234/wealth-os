@@ -143,6 +143,9 @@ export default function EntryPage() {
         new Set(assets.flatMap((item) => item.id ? [item.id] : [])),
         new Set(liabilities.flatMap((item) => item.id ? [item.id] : [])),
       );
+      if (data.baseCurrency !== baseCurrency && hasMonetaryFacts(assets, liabilities)) {
+        throw new Error("Base currency cannot change while the draft contains monetary facts. Clear all position amounts before changing it.");
+      }
       const changes = [
         ...(data.baseCurrency !== baseCurrency ? [`Change base currency: ${baseCurrency || "Not set"} → ${data.baseCurrency}`] : []),
         ...(data.snapshotDate && data.snapshotDate !== snapshotDate ? [`Change Snapshot date: ${displayDate(snapshotDate)} → ${displayDate(data.snapshotDate)}`] : []),
@@ -168,6 +171,7 @@ export default function EntryPage() {
   };
 
   const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
+  const baseCurrencyLocked = hasMonetaryFacts(assets, liabilities);
   const settingsComplete = Boolean(snapshotDate && currencyCode.test(baseCurrency));
   const assetsComplete = validAssets(assets, snapshotDate, baseCurrency);
   const liabilitiesComplete = validLiabilities(liabilities, snapshotDate, baseCurrency);
@@ -256,7 +260,7 @@ export default function EntryPage() {
           <div className="step-heading"><p className="eyebrow">Step 1 of 4</p><h2 id="settings-step-title" tabIndex={-1}>Settings</h2><p>Set the Snapshot context or accelerate entry with your own AI agent.</p></div>
           <section className="entry-settings" aria-label="Snapshot settings">
             <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
+            <label>Base currency<input data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !currencyCode.test(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} readOnly={baseCurrencyLocked} maxLength={3} pattern="[A-Z]{3}" placeholder="TWD" required />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !currencyCode.test(baseCurrency) && <span className="field-error">Base currency must be a three-letter uppercase code.</span>}</label>
           </section>
 
           <section className="ai-import" aria-labelledby="ai-import-title">
@@ -472,6 +476,10 @@ function validAssets(assets: AssetDraft[], snapshotDate: string, baseCurrency: s
 
 function validLiabilities(liabilities: LiabilityDraft[], snapshotDate: string, baseCurrency: string): boolean {
   return liabilities.every((item) => Boolean(item.name.trim() && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim() && validConversion(item.manualConversion, snapshotDate, baseCurrency)));
+}
+
+function hasMonetaryFacts(assets: AssetDraft[], liabilities: LiabilityDraft[]): boolean {
+  return assets.some((item) => item.amount.trim()) || liabilities.some((item) => item.amount.trim());
 }
 
 function validConversion(value: ManualConversionDraft | undefined, snapshotDate: string, baseCurrency: string): boolean {

@@ -143,7 +143,10 @@ private fun MoneyRequest.toDomain(baseCurrency: Currency, field: String): Money 
     }
 }
 
-private fun MoneyRequest.toDomain(field: String): Money {
+internal fun MoneyRequest.toDomain(field: String): Money {
+    if (!currency.matches(Regex("^[A-Z]{3}$"))) {
+        throw RequestValidationException("$field.currency", "must be an uppercase ISO 4217 currency code")
+    }
     val validatedCurrency = validated("$field.currency", "must be a supported ISO 4217 currency") { Currency.of(currency) }
     if (!amount.matches(Regex("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))) {
         throw RequestValidationException("$field.amount", "must be a decimal string")

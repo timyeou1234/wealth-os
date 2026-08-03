@@ -28,7 +28,7 @@ class SnapshotLiabilityPositionJpaEntity(
     val effectiveAt: Instant,
     @Column(nullable = false, length = 100)
     val source: String,
-    @Column(name = "conversion_original_amount", precision = 38, scale = 3)
+    @Column(name = "conversion_original_amount", precision = 38, scale = 6)
     val conversionOriginalAmount: BigDecimal? = null,
     @Column(name = "conversion_original_currency", columnDefinition = "char(3)")
     @JdbcTypeCode(SqlTypes.CHAR)

@@ -105,6 +105,28 @@ class SnapshotControllerTest {
             }
     }
 
+    @Test
+    fun `manual conversion rejects non-decimal amount syntax`() {
+        mockMvc.post("/api/v1/snapshots") {
+            contentType = MediaType.APPLICATION_JSON
+            content = manualConversionSnapshot(originalAmount = "1e3", originalCurrency = "EUR")
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets[0].manualConversion.originalMoney.amount") }
+        }
+    }
+
+    @Test
+    fun `manual conversion rejects a lowercase currency`() {
+        mockMvc.post("/api/v1/snapshots") {
+            contentType = MediaType.APPLICATION_JSON
+            content = manualConversionSnapshot(originalAmount = "1000.00", originalCurrency = "eur")
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets[0].manualConversion.originalMoney.currency") }
+        }
+    }
+
     private fun createSnapshot(asOf: String) {
         mockMvc.post("/api/v1/snapshots") {
             contentType = MediaType.APPLICATION_JSON
@@ -113,6 +135,24 @@ class SnapshotControllerTest {
             status { isCreated() }
         }
     }
+
+    private fun manualConversionSnapshot(
+        originalAmount: String,
+        originalCurrency: String,
+    ): String =
+        """
+        {
+          "asOf":"2026-08-01T00:00:00Z","recordedAt":"2026-08-01T00:00:00Z",
+          "assets":[{
+            "id":"0f27e4fa-99f8-4c5e-87da-527488cbe515","name":"Cash","type":"CASH","liquidity":"LIQUID",
+            "money":{"amount":"1250.00","currency":"USD"},"effectiveAt":"2026-08-01T00:00:00Z","source":"Bank",
+            "manualConversion":{
+              "originalMoney":{"amount":"$originalAmount","currency":"$originalCurrency"},
+              "exchangeRateBasis":"Declared rate","effectiveAt":"2026-08-01T00:00:00Z"
+            }
+          }],"liabilities":[]
+        }
+        """.trimIndent()
 
     private fun createResource(
         path: String,

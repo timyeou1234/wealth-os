@@ -8,8 +8,6 @@ import com.wealthos.asset.domain.ValuationSource
 import com.wealthos.domain.liability.LiabilityBalance
 import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilitySource
-import com.wealthos.domain.shared.Currency
-import com.wealthos.domain.shared.Money
 import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
@@ -66,9 +64,9 @@ data class CreateSnapshotRequest(
         return Snapshot.capture(
             id = SnapshotId.new(), asOf = asOf, recordedAt = recordedAt,
             assets = assets.mapIndexed { i, a -> com.wealthos.asset.domain.Asset(assetIds[i], a.name, a.type, a.liquidity) },
-            assetValuations = assets.mapIndexed { i, a -> AssetValuation(assetIds[i], Money.of(a.money.amount.toBigDecimal(), Currency.of(a.money.currency)), a.effectiveAt, ValuationSource.of(a.source), a.manualConversion?.toDomain()) },
+            assetValuations = assets.mapIndexed { i, a -> AssetValuation(assetIds[i], a.money.toDomain("assets[$i].money"), a.effectiveAt, ValuationSource.of(a.source), a.manualConversion?.toDomain("assets[$i].manualConversion")) },
             liabilities = liabilities.mapIndexed { i, l -> com.wealthos.domain.liability.Liability(liabilityIds[i], l.name) },
-            liabilityBalances = liabilities.mapIndexed { i, l -> LiabilityBalance(liabilityIds[i], Money.of(l.money.amount.toBigDecimal(), Currency.of(l.money.currency)), l.effectiveAt, LiabilitySource.of(l.source), l.manualConversion?.toDomain()) },
+            liabilityBalances = liabilities.mapIndexed { i, l -> LiabilityBalance(liabilityIds[i], l.money.toDomain("liabilities[$i].money"), l.effectiveAt, LiabilitySource.of(l.source), l.manualConversion?.toDomain("liabilities[$i].manualConversion")) },
         )
     }
 }
@@ -108,10 +106,3 @@ data class ManualConversionResponse(val originalMoney: MoneyResponse, val exchan
 }
 data class AssetFactResponse(val id: String, val name: String, val type: AssetType, val liquidity: Liquidity, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null)
 data class LiabilityFactResponse(val id: String, val name: String, val money: MoneyResponse, val effectiveAt: Instant, val source: String, val manualConversion: ManualConversionResponse? = null)
-
-private fun ManualConversionRequest.toDomain(): ManualConversion =
-    ManualConversion.of(
-        originalValue = Money.of(originalMoney.amount.toBigDecimal(), Currency.of(originalMoney.currency)),
-        exchangeRateBasis = exchangeRateBasis,
-        effectiveAt = effectiveAt,
-    )

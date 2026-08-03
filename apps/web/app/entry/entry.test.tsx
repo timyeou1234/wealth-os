@@ -138,16 +138,34 @@ describe("Balance-sheet entry", () => {
 
     fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
       "schemaVersion": 1,
-      "baseCurrency": "EUR",
+      "baseCurrency": "USD",
       "snapshotDate": "2026-08-01",
       "assets": [],
       "liabilities": []
     }` } });
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
-    expect(screen.getByText("Change base currency: USD → EUR")).toBeTruthy();
     expect(screen.getByText("Change Snapshot date: Aug 2, 2026 → Aug 1, 2026")).toBeTruthy();
     expect((screen.getByLabelText("Base currency") as HTMLInputElement).value).toBe("USD");
+  });
+
+  it("does not reinterpret existing monetary facts in another base currency", async () => {
+    render(<EntryPage />);
+    const baseCurrency = await screen.findByLabelText("Base currency") as HTMLInputElement;
+    expect(baseCurrency.readOnly).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
+      "schemaVersion": 1,
+      "baseCurrency": "EUR",
+      "snapshotDate": "2026-08-02",
+      "assets": [],
+      "liabilities": []
+    }` } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Base currency cannot change while the draft contains monetary facts");
+    expect(screen.queryByRole("dialog", { name: "Review AI import" })).toBeNull();
+    expect(baseCurrency.value).toBe("USD");
   });
 
   it("keeps keyboard focus inside dialogs and restores it when dismissed", async () => {
