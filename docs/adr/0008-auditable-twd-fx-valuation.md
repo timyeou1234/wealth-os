@@ -28,9 +28,8 @@ the initial CBC transport adapter. Synchronization bootstraps available history,
 up on startup, and runs at 18:30 Asia/Taipei on weekdays. Provider failures never trigger
 a silent provider change.
 
-Once the Snapshot slice of Issue #66 lands, each converted immutable Snapshot fact stores
-original Money, TWD Money, applied rate, actual rate date, provider, rate type, optional
-user basis, and HALF_EVEN rounding mode.
+Each converted immutable Snapshot fact stores original Money, TWD Money, applied rate,
+actual rate date, provider, rate type, optional user basis, and HALF_EVEN rounding mode.
 Display currency is a presentation preference; historical displays resolve conversion
 using each Snapshot date and never alter canonical results.
 
@@ -55,7 +54,8 @@ using each Snapshot date and never alter canonical results.
 - Never mutate an existing Snapshot when rates synchronize.
 - Never silently fall back from CBC to another provider.
 - Use `BigDecimal`; permit at most 12 decimal places for a rate and round only final TWD
-  Money to zero fraction digits with `RoundingMode.HALF_EVEN`.
+  Money to zero fraction digits with `RoundingMode.HALF_EVEN`. This canonical TWD rule
+  intentionally overrides the JDK currency metadata's two fraction digits.
 - Record `REFERENCE_RATE` for accepted CBC data and `USER_DECLARED` for every override.
 - Keep PostgreSQL authoritative and synchronization idempotent.
 - Do not attribute a Snapshot comparison delta to FX or position changes.

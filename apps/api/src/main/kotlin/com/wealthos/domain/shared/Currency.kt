@@ -5,7 +5,7 @@ import java.util.Locale
 @JvmInline
 value class Currency private constructor(val code: String) {
     val fractionDigits: Int
-        get() = java.util.Currency.getInstance(code).defaultFractionDigits
+        get() = if (code == "TWD") 0 else java.util.Currency.getInstance(code).defaultFractionDigits
 
     override fun toString(): String = code
 

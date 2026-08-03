@@ -91,6 +91,16 @@ export type MoneyRequest = {
     currency: string;
 };
 
+export type AppliedConversionResponse = {
+    originalMoney?: MoneyResponse;
+    rate?: string;
+    rateDate?: string;
+    provider?: string;
+    rateType?: string;
+    basis?: string | null;
+    roundingMode?: string;
+};
+
 export type AssetFactResponse = {
     id?: string;
     name?: string;
@@ -100,6 +110,7 @@ export type AssetFactResponse = {
     effectiveAt?: string;
     source?: string;
     manualConversion?: ManualConversionResponse | null;
+    appliedConversion?: AppliedConversionResponse | null;
 };
 
 export type LiabilityFactResponse = {
@@ -109,6 +120,7 @@ export type LiabilityFactResponse = {
     effectiveAt?: string;
     source?: string;
     manualConversion?: ManualConversionResponse | null;
+    appliedConversion?: AppliedConversionResponse | null;
 };
 
 export type ManualConversionResponse = {
@@ -136,7 +148,9 @@ export type CaptureAssetRequest = {
     name: string;
     type: 'CASH' | 'INVESTMENT' | 'REAL_ESTATE' | 'VEHICLE' | 'BUSINESS' | 'OTHER';
     liquidity: 'LIQUID' | 'SEMI_LIQUID' | 'ILLIQUID';
-    money: MoneyRequest;
+    money?: MoneyRequest | null;
+    originalMoney?: MoneyRequest | null;
+    declaredRate?: DeclaredRateRequest | null;
     effectiveAt: string;
     source: string;
     manualConversion?: ManualConversionRequest | null;
@@ -145,7 +159,9 @@ export type CaptureAssetRequest = {
 export type CaptureLiabilityRequest = {
     id?: string | null;
     name: string;
-    money: MoneyRequest;
+    money?: MoneyRequest | null;
+    originalMoney?: MoneyRequest | null;
+    declaredRate?: DeclaredRateRequest | null;
     effectiveAt: string;
     source: string;
     manualConversion?: ManualConversionRequest | null;
@@ -157,6 +173,12 @@ export type CaptureSnapshotRequest = {
     baseCurrency: string;
     assets: Array<CaptureAssetRequest>;
     liabilities: Array<CaptureLiabilityRequest>;
+};
+
+export type DeclaredRateRequest = {
+    rate: string;
+    rateDate: string;
+    basis: string;
 };
 
 export type CreateLiabilityRequest = {

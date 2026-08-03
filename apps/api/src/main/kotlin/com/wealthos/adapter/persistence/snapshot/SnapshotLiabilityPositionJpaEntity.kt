@@ -10,6 +10,7 @@ import org.hibernate.type.SqlTypes
 import java.io.Serializable
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 @Entity
@@ -37,6 +38,22 @@ class SnapshotLiabilityPositionJpaEntity(
     val conversionExchangeRateBasis: String? = null,
     @Column(name = "conversion_effective_at")
     val conversionEffectiveAt: Instant? = null,
+    @Column(name = "applied_original_amount", precision = 38, scale = 6)
+    val appliedOriginalAmount: BigDecimal? = null,
+    @Column(name = "applied_original_currency", length = 3)
+    val appliedOriginalCurrency: String? = null,
+    @Column(name = "applied_rate", precision = 38, scale = 12)
+    val appliedRate: BigDecimal? = null,
+    @Column(name = "applied_rate_date")
+    val appliedRateDate: LocalDate? = null,
+    @Column(name = "applied_provider", length = 32)
+    val appliedProvider: String? = null,
+    @Column(name = "applied_rate_type", length = 32)
+    val appliedRateType: String? = null,
+    @Column(name = "applied_basis", length = 200)
+    val appliedBasis: String? = null,
+    @Column(name = "applied_rounding_mode", length = 32)
+    val appliedRoundingMode: String? = null,
 )
 
 @Embeddable

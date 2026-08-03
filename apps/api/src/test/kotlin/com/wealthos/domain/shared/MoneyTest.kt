@@ -13,6 +13,7 @@ class MoneyTest {
     @Test
     fun `normalizes amount to the currency scale`() {
         assertEquals(BigDecimal("12.00"), Money.of(BigDecimal("12"), usd).amount)
+        assertEquals(BigDecimal("12"), Money.of(BigDecimal("12.00"), twd).amount)
     }
 
     @Test

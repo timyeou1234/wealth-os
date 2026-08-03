@@ -103,6 +103,24 @@ class PostgresMigrationTest
             insertAssetPosition(originalId, assetId, asOf)
 
             assertFailsWith<DataIntegrityViolationException> {
+                jdbc.update(
+                    """
+                    update snapshot_asset_positions
+                    set applied_original_amount = 100,
+                        applied_original_currency = 'USD',
+                        applied_rate = 32.292,
+                        applied_rate_date = '2026-01-30',
+                        applied_provider = 'USER',
+                        applied_rate_type = 'USER_DECLARED',
+                        applied_rounding_mode = 'HALF_EVEN'
+                    where snapshot_id = ? and asset_id = ?
+                    """.trimIndent(),
+                    originalId,
+                    assetId,
+                )
+            }
+
+            assertFailsWith<DataIntegrityViolationException> {
                 insertAssetPosition(originalId, assetId, asOf)
             }
         }

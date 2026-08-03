@@ -32,7 +32,9 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
+import com.wealthos.snapshot.application.DeclaredFxRate
 
 @RestController
 @RequestMapping("/api/v1/snapshot-captures")
@@ -84,7 +86,9 @@ data class CaptureAssetRequest(
     @field:NotBlank @field:Size(max = 200, message = "must contain at most 200 characters") val name: String,
     @field:NotNull val type: AssetType,
     @field:NotNull val liquidity: Liquidity,
-    @field:Valid @field:NotNull val money: MoneyRequest,
+    @field:Valid val money: MoneyRequest? = null,
+    @field:Valid val originalMoney: MoneyRequest? = null,
+    @field:Valid val declaredRate: DeclaredRateRequest? = null,
     @field:NotNull val effectiveAt: Instant,
     @field:NotBlank @field:Size(max = 100) val source: String,
     @field:Valid val manualConversion: ManualConversionRequest? = null,
@@ -95,7 +99,9 @@ data class CaptureAssetRequest(
             name = name,
             type = type,
             liquidity = liquidity,
-            money = money.toDomain(baseCurrency, "assets[$index].money"),
+            money = money?.toDomain(baseCurrency, "assets[$index].money"),
+            originalMoney = originalMoney?.toDomain("assets[$index].originalMoney"),
+            declaredRate = declaredRate?.toCommand("assets[$index].declaredRate"),
             effectiveAt = effectiveAt,
             source = validated("assets[$index].source", "must contain at most 100 characters") { ValuationSource.of(source) },
             manualConversion = manualConversion?.toDomain("assets[$index].manualConversion"),
@@ -105,7 +111,9 @@ data class CaptureAssetRequest(
 data class CaptureLiabilityRequest(
     val id: UUID? = null,
     @field:NotBlank @field:Size(max = 200, message = "must contain at most 200 characters") val name: String,
-    @field:Valid @field:NotNull val money: MoneyRequest,
+    @field:Valid val money: MoneyRequest? = null,
+    @field:Valid val originalMoney: MoneyRequest? = null,
+    @field:Valid val declaredRate: DeclaredRateRequest? = null,
     @field:NotNull val effectiveAt: Instant,
     @field:NotBlank @field:Size(max = 100) val source: String,
     @field:Valid val manualConversion: ManualConversionRequest? = null,
@@ -114,11 +122,30 @@ data class CaptureLiabilityRequest(
         CaptureLiability(
             id = id?.let(::LiabilityId),
             name = name,
-            money = money.toDomain(baseCurrency, "liabilities[$index].money"),
+            money = money?.toDomain(baseCurrency, "liabilities[$index].money"),
+            originalMoney = originalMoney?.toDomain("liabilities[$index].originalMoney"),
+            declaredRate = declaredRate?.toCommand("liabilities[$index].declaredRate"),
             effectiveAt = effectiveAt,
             source = validated("liabilities[$index].source", "must contain at most 100 characters") { LiabilitySource.of(source) },
             manualConversion = manualConversion?.toDomain("liabilities[$index].manualConversion"),
         )
+}
+
+data class DeclaredRateRequest(
+    @field:NotBlank @field:Schema(example = "32.292") val rate: String,
+    @field:NotNull @field:Schema(example = "2026-07-31") val rateDate: LocalDate,
+    @field:NotBlank @field:Size(max = 200) @field:Schema(example = "User bank quote") val basis: String,
+) {
+    fun toCommand(field: String): DeclaredFxRate {
+        if (!rate.matches(Regex("^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))) {
+            throw RequestValidationException("$field.rate", "must be a positive decimal string")
+        }
+        val decimal = rate.toBigDecimal()
+        if (decimal.signum() <= 0 || decimal.scale() > 12) {
+            throw RequestValidationException("$field.rate", "must be positive with at most 12 decimal places")
+        }
+        return DeclaredFxRate(decimal, rateDate, basis.trim())
+    }
 }
 
 data class ManualConversionRequest(

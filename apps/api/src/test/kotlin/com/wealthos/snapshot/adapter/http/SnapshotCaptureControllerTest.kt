@@ -1,7 +1,11 @@
 package com.wealthos.snapshot.adapter.http
 
+import com.wealthos.fxrate.application.FxRateProvider
+import com.wealthos.fxrate.application.ProvidedFxRate
+import com.wealthos.fxrate.application.SupportedFxCurrency
 import org.hamcrest.Matchers.matchesPattern
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -10,6 +14,9 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.math.BigDecimal
+import java.time.LocalDate
 
 @SpringBootTest(
     properties = [
@@ -24,6 +31,89 @@ import org.springframework.test.web.servlet.post
 class SnapshotCaptureControllerTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @MockitoBean
+    private lateinit var fxRateProvider: FxRateProvider
+
+    @Test
+    fun `capture converts original USD money with the nearest non-future CBC rate and preserves evidence`() {
+        val rateDate = LocalDate.parse("2026-07-31")
+        `when`(fxRateProvider.name).thenReturn("CBC")
+        `when`(fxRateProvider.supportedCurrencies())
+            .thenReturn(listOf(SupportedFxCurrency("USD", rateDate, rateDate)))
+        `when`(fxRateProvider.fetch("USD", rateDate, rateDate))
+            .thenReturn(listOf(ProvidedFxRate("USD", BigDecimal("32.292"), rateDate)))
+        mockMvc.post("/api/v1/fx-rates/sync") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"from":"2026-07-31","to":"2026-07-31"}"""
+        }.andExpect { status { isOk() } }
+
+        val capture = mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-03T00:00:00Z",
+                  "recordedAt":"2026-08-03T08:00:00Z",
+                  "baseCurrency":"TWD",
+                  "assets":[{
+                    "name":"US cash","type":"CASH","liquidity":"LIQUID",
+                    "originalMoney":{"amount":"100.00","currency":"USD"},
+                    "effectiveAt":"2026-08-03T00:00:00Z","source":"Bank statement"
+                  }],
+                  "liabilities":[]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.baseCurrency") { value("TWD") }
+            jsonPath("$.assets[0].money.amount") { value("3229") }
+            jsonPath("$.assets[0].money.currency") { value("TWD") }
+            jsonPath("$.assets[0].appliedConversion.originalMoney.amount") { value("100.00") }
+            jsonPath("$.assets[0].appliedConversion.originalMoney.currency") { value("USD") }
+            jsonPath("$.assets[0].appliedConversion.rate") { value("32.292") }
+            jsonPath("$.assets[0].appliedConversion.rateDate") { value("2026-07-31") }
+            jsonPath("$.assets[0].appliedConversion.provider") { value("CBC") }
+            jsonPath("$.assets[0].appliedConversion.rateType") { value("REFERENCE_RATE") }
+            jsonPath("$.assets[0].appliedConversion.roundingMode") { value("HALF_EVEN") }
+        }.andReturn()
+
+        mockMvc.get(requireNotNull(capture.response.getHeader("Location"))).andExpect {
+            status { isOk() }
+            jsonPath("$.assets[0].money.amount") { value("3229") }
+            jsonPath("$.assets[0].appliedConversion.rate") { value("32.292") }
+            jsonPath("$.assets[0].appliedConversion.rateDate") { value("2026-07-31") }
+        }
+    }
+
+    @Test
+    fun `capture uses an explicit user-declared rate with a required basis`() {
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-03T00:00:00Z",
+                  "recordedAt":"2026-08-03T08:00:00Z",
+                  "baseCurrency":"TWD",
+                  "assets":[],
+                  "liabilities":[{
+                    "name":"Swiss loan",
+                    "originalMoney":{"amount":"100.00","currency":"CHF"},
+                    "declaredRate":{"rate":"37","rateDate":"2026-08-01","basis":"User bank quote"},
+                    "effectiveAt":"2026-08-03T00:00:00Z","source":"Bank statement"
+                  }]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.liabilities[0].money.amount") { value("3700") }
+            jsonPath("$.liabilities[0].appliedConversion.rate") { value("37") }
+            jsonPath("$.liabilities[0].appliedConversion.provider") { value("USER") }
+            jsonPath("$.liabilities[0].appliedConversion.rateType") { value("USER_DECLARED") }
+            jsonPath("$.liabilities[0].appliedConversion.basis") { value("User bank quote") }
+        }
+    }
 
     @Test
     fun `capture rejects lowercase base currency`() {

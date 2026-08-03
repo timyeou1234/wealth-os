@@ -47,11 +47,16 @@ browser from introducing binary rounding errors into financial values. `currency
 uppercase ISO 4217 currency code. Feature endpoints must not return a bare amount without
 its currency.
 
-The target Snapshot contract in Issue #66 (not implemented by the FX-rate infrastructure
-slice) uses `originalMoney` for the submitted fact and TWD
-`money` for canonical valuation. Foreign-currency facts include structured
+Snapshot capture accepts `originalMoney` for the submitted fact and returns TWD `money`
+for canonical valuation. Foreign-currency facts include structured
 `appliedConversion` evidence: rate, rate date, provider, rate type, optional user basis,
 and rounding mode.
+
+During the incremental Issue #66 rollout, existing callers may continue to submit legacy
+`money` and `manualConversion`. A new caller submits `originalMoney` instead of `money`.
+It may include `declaredRate` with a positive decimal `rate`, non-future `rateDate`, and
+non-blank `basis`; otherwise Wealth OS resolves the nearest non-future CBC rate. New
+original-money captures require canonical `baseCurrency` `TWD`.
 
 ## Foreign-exchange rates
 
