@@ -6,7 +6,7 @@ import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAsset
 import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
 import { AppNavigation } from "../app-navigation";
 import { parseAgentImport } from "./import";
-import type { AgentImport } from "./import";
+import type { AgentImport, AgentImportAsset, AgentImportLiability, AgentImportManualConversion } from "./import";
 
 type AssetType = CaptureAssetRequest["type"];
 type Liquidity = CaptureAssetRequest["liquidity"];
@@ -161,8 +161,8 @@ export default function EntryPage() {
       const changes = [
         ...(data.baseCurrency !== baseCurrency ? [`Change base currency: ${baseCurrency || "Not set"} → ${data.baseCurrency}`] : []),
         ...(data.snapshotDate && data.snapshotDate !== snapshotDate ? [`Change Snapshot date: ${displayDate(snapshotDate)} → ${displayDate(data.snapshotDate)}`] : []),
-        ...data.assets.map((item) => item.id ? `Update asset: ${assets.find((asset) => asset.id === item.id)?.name} → ${item.name}` : `Add asset: ${item.name}`),
-        ...data.liabilities.map((item) => item.id ? `Update liability: ${liabilities.find((liability) => liability.id === item.id)?.name} → ${item.name}` : `Add liability: ${item.name}`),
+        ...data.assets.flatMap((item) => item.id ? describeAssetUpdate(assets.find((asset) => asset.id === item.id)!, item) : [`Add asset: ${item.name}`]),
+        ...data.liabilities.flatMap((item) => item.id ? describeLiabilityUpdate(liabilities.find((liability) => liability.id === item.id)!, item) : [`Add liability: ${item.name}`]),
       ];
       setImportReview({ data, changes });
     } catch (exception) {
@@ -501,6 +501,36 @@ function validLiabilities(liabilities: LiabilityDraft[], snapshotDate: string, b
 
 function hasMonetaryFacts(assets: AssetDraft[], liabilities: LiabilityDraft[]): boolean {
   return assets.some((item) => item.amount.trim()) || liabilities.some((item) => item.amount.trim());
+}
+
+function describeAssetUpdate(current: AssetDraft, imported: AgentImportAsset): string[] {
+  return describeChangedFields(`Asset ${current.name}`, [
+    ["Name", current.name, imported.name],
+    ["Type", current.type, imported.type],
+    ["Liquidity", current.liquidity, imported.liquidity],
+    ["Amount", current.amount, imported.amount],
+    ["Effective date", current.effectiveDate, imported.effectiveDate],
+    ["Source", current.source, imported.source],
+    ["Manual conversion", describeManualConversion(current.manualConversion), describeManualConversion(imported.manualConversion)],
+  ]);
+}
+
+function describeLiabilityUpdate(current: LiabilityDraft, imported: AgentImportLiability): string[] {
+  return describeChangedFields(`Liability ${current.name}`, [
+    ["Name", current.name, imported.name],
+    ["Amount", current.amount, imported.amount],
+    ["Effective date", current.effectiveDate, imported.effectiveDate],
+    ["Source", current.source, imported.source],
+    ["Manual conversion", describeManualConversion(current.manualConversion), describeManualConversion(imported.manualConversion)],
+  ]);
+}
+
+function describeChangedFields(subject: string, fields: Array<[string, string, string]>): string[] {
+  return fields.flatMap(([label, before, after]) => before === after ? [] : [`${subject} — ${label}: ${before} → ${after}`]);
+}
+
+function describeManualConversion(value?: ManualConversionDraft | AgentImportManualConversion): string {
+  return value ? `${value.originalAmount} ${value.originalCurrency}; ${value.exchangeRateBasis}; effective ${value.effectiveDate}` : "None";
 }
 
 function validConversion(value: ManualConversionDraft | undefined, snapshotDate: string, baseCurrency: string): boolean {

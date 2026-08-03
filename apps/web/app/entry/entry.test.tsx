@@ -151,7 +151,7 @@ describe("Balance-sheet entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
 
     expect(screen.getByRole("dialog", { name: "Review AI import" })).toBeTruthy();
-    expect(screen.getByText("Update asset: Cash → Updated cash")).toBeTruthy();
+    expect(screen.getByText("Asset Cash — Name: Cash → Updated cash")).toBeTruthy();
     expect(screen.getByText("Add liability: Mortgage")).toBeTruthy();
     expect(api.captureSnapshot).not.toHaveBeenCalled();
 
@@ -165,6 +165,42 @@ describe("Balance-sheet entry", () => {
     expect(screen.getByRole("group", { name: "New liability" })).toBeTruthy();
     expect((screen.getByLabelText("New liability original amount") as HTMLInputElement).value).toBe("320.00");
     expect((screen.getByLabelText("New liability original currency") as HTMLInputElement).value).toBe("EUR");
+    expect(api.captureSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("previews every changed financial field before applying an agent update", async () => {
+    render(<EntryPage />);
+    await screen.findByLabelText("Agent JSON");
+    fireEvent.change(screen.getByLabelText("Agent JSON"), { target: { value: `{
+      "schemaVersion": 1,
+      "baseCurrency": "USD",
+      "snapshotDate": "2026-08-02",
+      "assets": [{
+        "id": "${assetId}",
+        "name": "Cash",
+        "type": "INVESTMENT",
+        "liquidity": "SEMI_LIQUID",
+        "amount": "1200.00",
+        "effectiveDate": "2026-08-01",
+        "source": "New statement",
+        "manualConversion": {
+          "originalAmount": "1000.00",
+          "originalCurrency": "EUR",
+          "exchangeRateBasis": "ECB EUR/USD reference rate 1.20",
+          "effectiveDate": "2026-08-01"
+        }
+      }],
+      "liabilities": []
+    }` } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect(screen.getByText("Asset Cash — Type: CASH → INVESTMENT")).toBeTruthy();
+    expect(screen.getByText("Asset Cash — Liquidity: LIQUID → SEMI_LIQUID")).toBeTruthy();
+    expect(screen.getByText("Asset Cash — Amount: 1000.00 → 1200.00")).toBeTruthy();
+    expect(screen.getByText("Asset Cash — Effective date: 2026-07-30 → 2026-08-01")).toBeTruthy();
+    expect(screen.getByText("Asset Cash — Source: Bank statement → New statement")).toBeTruthy();
+    expect(screen.getByText("Asset Cash — Manual conversion: None → 1000.00 EUR; ECB EUR/USD reference rate 1.20; effective 2026-08-01")).toBeTruthy();
     expect(api.captureSnapshot).not.toHaveBeenCalled();
   });
 
