@@ -81,6 +81,25 @@ describe("Balance-sheet entry", () => {
     expect(screen.getByLabelText("Base currency")).toBeTruthy();
   });
 
+  it("restores base currency from an empty Snapshot", async () => {
+    api.listAssets.mockResolvedValue({ data: [] });
+    api.listLiabilities.mockResolvedValue({ data: [] });
+    api.listSnapshots.mockResolvedValue({ data: [{ id: "empty-snapshot", asOf: "2026-07-31T00:00:00Z" }] });
+    api.getSnapshot.mockResolvedValue({ data: {
+      id: "empty-snapshot",
+      asOf: "2026-07-31T00:00:00Z",
+      recordedAt: "2026-07-31T08:00:00Z",
+      baseCurrency: "TWD",
+      assets: [],
+      liabilities: [],
+    } });
+
+    render(<EntryPage />);
+
+    expect((await screen.findByLabelText("Base currency") as HTMLInputElement).value).toBe("TWD");
+    expect((screen.getByLabelText("AI Prompt") as HTMLTextAreaElement).value).toContain("Base currency TWD");
+  });
+
   it("searches ISO base-currency suggestions by name on first use", async () => {
     api.listSnapshots.mockResolvedValue({ data: [] });
     render(<EntryPage />);

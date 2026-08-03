@@ -126,6 +126,7 @@ export type SnapshotResponse = {
     id?: string;
     asOf?: string;
     recordedAt?: string;
+    baseCurrency?: string | null;
     assets?: Array<AssetFactResponse>;
     liabilities?: Array<LiabilityFactResponse>;
 };

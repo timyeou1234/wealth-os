@@ -82,6 +82,11 @@ provenance required to display and recalculate history.
 Wealth OS captured that immutable record. A Snapshot cannot be recorded before its
 financial `asOf` time.
 
+`baseCurrency` optionally records the selected currency context of an application-level
+capture. Atomic entry captures always set it, even for an empty Snapshot, so the next
+entry can restore the user's choice without inferring it from a position. It remains
+optional for older and direct mixed-currency Snapshots and is preserved by corrections.
+
 It enforces:
 
 - A normal capture has exactly one valuation or balance for every in-scope current

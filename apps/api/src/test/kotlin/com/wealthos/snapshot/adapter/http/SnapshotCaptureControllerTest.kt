@@ -26,6 +26,110 @@ class SnapshotCaptureControllerTest {
     private lateinit var mockMvc: MockMvc
 
     @Test
+    fun `capture rejects lowercase base currency`() {
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-02T00:00:00Z",
+                  "recordedAt":"2026-08-02T08:00:00Z",
+                  "baseCurrency":"usd",
+                  "assets":[],
+                  "liabilities":[]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("baseCurrency") }
+            jsonPath("$.errors[0].message") { value("must be an uppercase ISO 4217 currency code") }
+        }
+    }
+
+    @Test
+    fun `capture rejects an overlong asset name`() {
+        val overlongName = "a".repeat(201)
+
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-02T00:00:00Z",
+                  "recordedAt":"2026-08-02T08:00:00Z",
+                  "baseCurrency":"USD",
+                  "assets":[{
+                    "name":"$overlongName","type":"CASH","liquidity":"LIQUID",
+                    "money":{"amount":"1.00","currency":"USD"},
+                    "effectiveAt":"2026-08-02T00:00:00Z","source":"Statement"
+                  }],
+                  "liabilities":[]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("assets[0].name") }
+            jsonPath("$.errors[0].message") { value("must contain at most 200 characters") }
+        }
+    }
+
+    @Test
+    fun `capture rejects an overlong liability name`() {
+        val overlongName = "l".repeat(201)
+
+        mockMvc.post("/api/v1/snapshot-captures") {
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "asOf":"2026-08-02T00:00:00Z",
+                  "recordedAt":"2026-08-02T08:00:00Z",
+                  "baseCurrency":"USD",
+                  "assets":[],
+                  "liabilities":[{
+                    "name":"$overlongName",
+                    "money":{"amount":"1.00","currency":"USD"},
+                    "effectiveAt":"2026-08-02T00:00:00Z","source":"Statement"
+                  }]
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.errors[0].field") { value("liabilities[0].name") }
+            jsonPath("$.errors[0].message") { value("must contain at most 200 characters") }
+        }
+    }
+
+    @Test
+    fun `empty capture persists and returns its base currency`() {
+        val capture =
+            mockMvc.post("/api/v1/snapshot-captures") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "asOf":"2026-08-02T00:00:00Z",
+                      "recordedAt":"2026-08-02T08:00:00Z",
+                      "baseCurrency":"TWD",
+                      "assets":[],
+                      "liabilities":[]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.baseCurrency") { value("TWD") }
+            }.andReturn()
+
+        mockMvc.get(requireNotNull(capture.response.getHeader("Location")))
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.baseCurrency") { value("TWD") }
+                jsonPath("$.assets") { isEmpty() }
+                jsonPath("$.liabilities") { isEmpty() }
+            }
+    }
+
+    @Test
     fun `capture updates every active position and creates one snapshot`() {
         val assetId = createResource("/api/v1/assets", """{"name":"Cash","type":"CASH","liquidity":"LIQUID"}""")
         val liabilityId = createResource("/api/v1/liabilities", """{"name":"Loan"}""")

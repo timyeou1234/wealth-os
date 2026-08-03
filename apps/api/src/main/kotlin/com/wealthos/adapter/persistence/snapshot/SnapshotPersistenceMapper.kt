@@ -24,6 +24,7 @@ internal object SnapshotPersistenceMapper {
             id = snapshot.id.value,
             asOf = snapshot.asOf,
             recordedAt = snapshot.recordedAt,
+            baseCurrency = snapshot.baseCurrency?.code,
             supersedesId = snapshot.supersedes?.value,
             correctionReason = snapshot.correction?.reason?.value,
         )
@@ -79,6 +80,7 @@ internal object SnapshotPersistenceMapper {
             id = SnapshotId(snapshot.id),
             asOf = snapshot.asOf,
             recordedAt = snapshot.recordedAt,
+            baseCurrency = snapshot.baseCurrency?.let(Currency::of),
             assetPositions = assets.map(SnapshotPersistenceMapper::assetPosition),
             liabilityPositions = liabilities.map(SnapshotPersistenceMapper::liabilityPosition),
             correction =

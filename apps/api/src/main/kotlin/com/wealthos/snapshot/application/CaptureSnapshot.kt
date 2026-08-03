@@ -55,6 +55,7 @@ class CaptureSnapshot(
                 id = SnapshotId.new(),
                 asOf = command.asOf,
                 recordedAt = command.recordedAt,
+                baseCurrency = command.baseCurrency,
                 assets = capturedAssets,
                 assetValuations =
                     capturedAssets.zip(command.assets).mapIndexed { index, (asset, input) ->

@@ -4,12 +4,14 @@ import com.wealthos.asset.domain.Asset
 import com.wealthos.asset.domain.AssetValuation
 import com.wealthos.domain.liability.Liability
 import com.wealthos.domain.liability.LiabilityBalance
+import com.wealthos.domain.shared.Currency
 import java.time.Instant
 
 class Snapshot private constructor(
     val id: SnapshotId,
     val asOf: Instant,
     val recordedAt: Instant,
+    val baseCurrency: Currency?,
     assetPositions: List<SnapshotAssetPosition>,
     liabilityPositions: List<SnapshotLiabilityPosition>,
     val correction: SnapshotCorrection?,
@@ -57,6 +59,7 @@ class Snapshot private constructor(
             assetValuations: Collection<AssetValuation> = emptyList(),
             liabilities: Collection<Liability> = emptyList(),
             liabilityBalances: Collection<LiabilityBalance> = emptyList(),
+            baseCurrency: Currency? = null,
         ): Snapshot {
             val assetsById = assets.associateBy(Asset::id)
             require(assetsById.size == assets.size) {
@@ -94,6 +97,7 @@ class Snapshot private constructor(
                 id = id,
                 asOf = asOf,
                 recordedAt = recordedAt,
+                baseCurrency = baseCurrency,
                 assetPositions =
                     assets.map { asset ->
                         SnapshotAssetPosition.capture(
@@ -128,6 +132,7 @@ class Snapshot private constructor(
                 id = id,
                 asOf = supersedes.asOf,
                 recordedAt = recordedAt,
+                baseCurrency = supersedes.baseCurrency,
                 assetPositions = replacementAssetPositions.toList(),
                 liabilityPositions = replacementLiabilityPositions.toList(),
                 correction =
@@ -142,6 +147,7 @@ class Snapshot private constructor(
             id: SnapshotId,
             asOf: Instant,
             recordedAt: Instant,
+            baseCurrency: Currency? = null,
             assetPositions: Collection<SnapshotAssetPosition>,
             liabilityPositions: Collection<SnapshotLiabilityPosition>,
             correction: SnapshotCorrection?,
@@ -150,6 +156,7 @@ class Snapshot private constructor(
                 id = id,
                 asOf = asOf,
                 recordedAt = recordedAt,
+                baseCurrency = baseCurrency,
                 assetPositions = assetPositions.toList(),
                 liabilityPositions = liabilityPositions.toList(),
                 correction = correction,

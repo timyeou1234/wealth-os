@@ -65,6 +65,9 @@ data class CaptureSnapshotRequest(
     @field:Valid @field:NotNull val liabilities: List<CaptureLiabilityRequest>,
 ) {
     fun toCommand(): CaptureSnapshotCommand {
+        if (!baseCurrency.matches(UPPERCASE_CURRENCY_CODE)) {
+            throw RequestValidationException("baseCurrency", "must be an uppercase ISO 4217 currency code")
+        }
         val currency = validated("baseCurrency", "must be a supported ISO 4217 currency") { Currency.of(baseCurrency) }
         return CaptureSnapshotCommand(
             asOf = asOf,
@@ -78,7 +81,7 @@ data class CaptureSnapshotRequest(
 
 data class CaptureAssetRequest(
     val id: UUID? = null,
-    @field:NotBlank val name: String,
+    @field:NotBlank @field:Size(max = 200, message = "must contain at most 200 characters") val name: String,
     @field:NotNull val type: AssetType,
     @field:NotNull val liquidity: Liquidity,
     @field:Valid @field:NotNull val money: MoneyRequest,
@@ -101,7 +104,7 @@ data class CaptureAssetRequest(
 
 data class CaptureLiabilityRequest(
     val id: UUID? = null,
-    @field:NotBlank val name: String,
+    @field:NotBlank @field:Size(max = 200, message = "must contain at most 200 characters") val name: String,
     @field:Valid @field:NotNull val money: MoneyRequest,
     @field:NotNull val effectiveAt: Instant,
     @field:NotBlank @field:Size(max = 100) val source: String,
@@ -144,7 +147,7 @@ private fun MoneyRequest.toDomain(baseCurrency: Currency, field: String): Money 
 }
 
 internal fun MoneyRequest.toDomain(field: String): Money {
-    if (!currency.matches(Regex("^[A-Z]{3}$"))) {
+    if (!currency.matches(UPPERCASE_CURRENCY_CODE)) {
         throw RequestValidationException("$field.currency", "must be an uppercase ISO 4217 currency code")
     }
     val validatedCurrency = validated("$field.currency", "must be a supported ISO 4217 currency") { Currency.of(currency) }
@@ -164,3 +167,5 @@ private inline fun <T> validated(field: String, message: String, block: () -> T)
     } catch (_: ArithmeticException) {
         throw RequestValidationException(field, message)
     }
+
+private val UPPERCASE_CURRENCY_CODE = Regex("^[A-Z]{3}$")

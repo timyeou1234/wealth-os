@@ -30,6 +30,7 @@ validates the schema but never creates or updates it.
 A Snapshot row owns immutable asset-position and liability-position rows. Correction
 metadata is stored on the Snapshot row:
 
+- optional base-currency capture context;
 - `supersedes_id` references the direct predecessor;
 - `correction_reason` is present exactly when `supersedes_id` is present; and
 - a unique constraint on `supersedes_id` permits at most one direct successor.

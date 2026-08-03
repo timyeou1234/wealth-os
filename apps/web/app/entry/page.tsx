@@ -547,7 +547,7 @@ function hydrate(
 ) {
   const assetFacts = new Map((snapshot?.assets ?? []).map((fact) => [fact.id, fact]));
   const liabilityFacts = new Map((snapshot?.liabilities ?? []).map((fact) => [fact.id, fact]));
-  const currency = snapshot?.assets?.[0]?.money?.currency ?? snapshot?.liabilities?.[0]?.money?.currency ?? "";
+  const currency = snapshot?.baseCurrency ?? snapshot?.assets?.[0]?.money?.currency ?? snapshot?.liabilities?.[0]?.money?.currency ?? "";
   setBaseCurrency(currency);
   setAssets(currentAssets.map((asset, index) => assetDraft(asset, assetFacts.get(asset.id), snapshot?.asOf, index)));
   setLiabilities(currentLiabilities.map((liability, index) => liabilityDraft(liability, liabilityFacts.get(liability.id), snapshot?.asOf, index)));

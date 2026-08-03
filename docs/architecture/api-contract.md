@@ -113,6 +113,9 @@ transaction.
 - The request must include every active Asset and Liability. Missing active identities,
   duplicate identities, unknown identities, and archived identities are invalid.
 - Every monetary fact must use the request's base currency.
+- The selected base currency is stored on the resulting Snapshot and returned as
+  `baseCurrency`, including when the Snapshot has no positions. Snapshots created through
+  the general direct API may omit this capture context and return `null`.
 - Metadata mutations and Snapshot persistence either commit together or roll back
   together.
 - Omission never archives a resource. Archiving remains an explicit, separately
