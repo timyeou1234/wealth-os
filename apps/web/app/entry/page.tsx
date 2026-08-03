@@ -5,7 +5,7 @@ import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "re
 import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
 import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
 import { AppNavigation } from "../app-navigation";
-import { isSupportedCurrency, parseAgentImport, supportedCurrencies } from "./import";
+import { currencyName, isSupportedCurrency, parseAgentImport, supportedCurrencies } from "./import";
 import type { AgentImport, AgentImportAsset, AgentImportLiability, AgentImportManualConversion } from "./import";
 
 type AssetType = CaptureAssetRequest["type"];
@@ -266,7 +266,7 @@ export default function EntryPage() {
           <div className="step-heading"><p className="eyebrow">Shared settings</p><h2 id="snapshot-context-title">Snapshot context</h2><p>These values apply to both AI-assisted import and manual entry.</p></div>
           <div className="entry-settings">
             <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-            <label>Base currency<select data-api-field="baseCurrency" aria-label="Base currency" aria-invalid={showValidation && !isSupportedCurrency(baseCurrency) || undefined} aria-describedby={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value)} disabled={baseCurrencyLocked} required><option value="">Select currency</option>{supportedCurrencies.map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select>{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !isSupportedCurrency(baseCurrency) && <span className="field-error">Base currency must be a supported ISO 4217 currency.</span>}</label>
+            <div className="currency-field"><label htmlFor="base-currency">Base currency</label><BaseCurrencyCombobox value={baseCurrency} onChange={setBaseCurrency} disabled={baseCurrencyLocked} invalid={showValidation && !isSupportedCurrency(baseCurrency)} describedBy={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !isSupportedCurrency(baseCurrency) && <span className="field-error">Base currency must be a supported ISO 4217 currency.</span>}</div>
           </div>
         </section>
 
@@ -338,6 +338,85 @@ export default function EntryPage() {
       </form>}
     </main>
   );
+}
+
+function BaseCurrencyCombobox({ value, onChange, disabled, invalid, describedBy }: { value: string; onChange: (currency: string) => void; disabled: boolean; invalid: boolean; describedBy?: string }) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const query = value.trim().toLowerCase();
+  const matches = supportedCurrencies.filter((currency) => !query || currency.toLowerCase().includes(query) || currencyName(currency).toLowerCase().includes(query));
+  const activeCurrency = matches[activeIndex];
+
+  useEffect(() => {
+    inputRef.current?.setCustomValidity(value && !isSupportedCurrency(value) ? "Select a supported ISO 4217 currency." : "");
+  }, [value]);
+
+  const choose = (currency: string) => {
+    onChange(currency);
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const navigate = (direction: 1 | -1) => {
+    if (!matches.length) return;
+    setOpen(true);
+    setActiveIndex((current) => direction === 1
+      ? current >= matches.length - 1 ? 0 : current + 1
+      : current <= 0 ? matches.length - 1 : current - 1);
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      navigate(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      navigate(-1);
+    } else if (event.key === "Enter" && open && activeCurrency) {
+      event.preventDefault();
+      choose(activeCurrency);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+      setActiveIndex(-1);
+    }
+  };
+
+  return <div className="currency-combobox">
+    <input
+      ref={inputRef}
+      id="base-currency"
+      data-api-field="baseCurrency"
+      role="combobox"
+      aria-label="Base currency"
+      aria-autocomplete="list"
+      aria-expanded={open}
+      aria-controls="base-currency-options"
+      aria-activedescendant={activeCurrency ? `base-currency-${activeCurrency}` : undefined}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
+      value={value}
+      onChange={(event) => { onChange(event.target.value.toUpperCase()); setOpen(true); setActiveIndex(-1); }}
+      onFocus={() => !disabled && setOpen(true)}
+      onBlur={() => { setOpen(false); setActiveIndex(-1); }}
+      onKeyDown={onKeyDown}
+      autoComplete="off"
+      disabled={disabled}
+      required
+    />
+    {open && <div id="base-currency-options" className="currency-options" role="listbox" aria-label="Base currency suggestions">
+      {matches.length ? matches.map((currency, index) => <button
+        key={currency}
+        id={`base-currency-${currency}`}
+        type="button"
+        role="option"
+        aria-label={`${currency} — ${currencyName(currency)}`}
+        aria-selected={index === activeIndex}
+        tabIndex={-1}
+        onMouseDown={(event) => { event.preventDefault(); choose(currency); }}
+      ><strong>{currency}</strong><span>—</span><span>{currencyName(currency)}</span></button>) : <p role="status">No matching ISO 4217 currency.</p>}
+    </div>}
+  </div>;
 }
 
 const entrySteps: Array<{ id: EntryStep; label: string }> = [

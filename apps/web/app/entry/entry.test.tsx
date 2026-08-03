@@ -81,19 +81,19 @@ describe("Balance-sheet entry", () => {
     expect(screen.getByLabelText("Base currency")).toBeTruthy();
   });
 
-  it("offers prioritized ISO base currencies on first use", async () => {
+  it("searches ISO base-currency suggestions by name on first use", async () => {
     api.listSnapshots.mockResolvedValue({ data: [] });
     render(<EntryPage />);
 
-    const currency = await screen.findByRole("combobox", { name: "Base currency" }) as HTMLSelectElement;
-    const options = within(currency).getAllByRole("option").map((option) => option.textContent);
-    expect(options.slice(0, 11)).toEqual(["Select currency", "TWD", "USD", "EUR", "JPY", "CNY", "HKD", "GBP", "AUD", "CAD", "SGD"]);
-    expect(options).toContain("CHF");
-    expect(options).toContain("ZAR");
+    const currency = await screen.findByRole("combobox", { name: "Base currency" }) as HTMLInputElement;
+    fireEvent.focus(currency);
+    fireEvent.change(currency, { target: { value: "taiwan" } });
 
-    fireEvent.change(currency, { target: { value: "CHF" } });
-    expect(currency.value).toBe("CHF");
-    expect((screen.getByLabelText("AI Prompt") as HTMLTextAreaElement).value).toContain("Base currency CHF");
+    const suggestions = screen.getByRole("listbox", { name: "Base currency suggestions" });
+    fireEvent.mouseDown(within(suggestions).getByRole("option", { name: "TWD — New Taiwan Dollar" }));
+    expect(currency.value).toBe("TWD");
+    expect(screen.queryByRole("listbox", { name: "Base currency suggestions" })).toBeNull();
+    expect((screen.getByLabelText("AI Prompt") as HTMLTextAreaElement).value).toContain("Base currency TWD");
   });
 
   it("switches Input modes with standard tab keyboard controls", async () => {
