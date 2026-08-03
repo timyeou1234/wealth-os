@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EntryPage from "./page";
 
 const assetId = "0f27e4fa-99f8-4c5e-87da-527488cbe515";
+const originalTimezone = process.env.TZ;
 
 const api = vi.hoisted(() => ({
   archiveAsset: vi.fn(),
@@ -39,6 +40,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (originalTimezone === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTimezone;
   vi.useRealTimers();
   cleanup();
 });
@@ -98,6 +101,35 @@ describe("Balance-sheet entry", () => {
 
     expect((await screen.findByLabelText("Base currency") as HTMLInputElement).value).toBe("TWD");
     expect((screen.getByLabelText("AI Prompt") as HTMLTextAreaElement).value).toContain("Base currency TWD");
+  });
+
+  it("requires an explicit currency when a legacy Snapshot contains mixed currencies", async () => {
+    api.listLiabilities.mockResolvedValue({ data: [{ id: "liability-1", name: "Loan", archived: false }] });
+    api.getSnapshot.mockResolvedValue({ data: {
+      id: "snapshot-1",
+      asOf: "2026-07-31T00:00:00Z",
+      recordedAt: "2026-07-31T08:00:00Z",
+      baseCurrency: null,
+      assets: [{ id: assetId, name: "Cash", type: "CASH", liquidity: "LIQUID", money: { amount: "1000.00", currency: "USD" }, effectiveAt: "2026-07-30T00:00:00Z", source: "Statement" }],
+      liabilities: [{ id: "liability-1", name: "Loan", money: { amount: "500.00", currency: "EUR" }, effectiveAt: "2026-07-30T00:00:00Z", source: "Statement" }],
+    } });
+
+    render(<EntryPage />);
+
+    const currency = await screen.findByLabelText("Base currency") as HTMLInputElement;
+    expect(currency.value).toBe("");
+    expect(currency.disabled).toBe(false);
+  });
+
+  it("defaults Snapshot date to the user's local calendar day", async () => {
+    process.env.TZ = "Asia/Taipei";
+    vi.setSystemTime(new Date("2026-08-02T16:30:00Z"));
+    api.listAssets.mockResolvedValue({ data: [] });
+    api.listSnapshots.mockResolvedValue({ data: [] });
+
+    render(<EntryPage />);
+
+    expect((await screen.findByLabelText("Snapshot date") as HTMLInputElement).value).toBe("2026-08-03");
   });
 
   it("searches ISO base-currency suggestions by name on first use", async () => {

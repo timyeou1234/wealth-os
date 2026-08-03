@@ -48,7 +48,12 @@ type InputMode = "manual" | "ai";
 
 const instant = (day: string) => new Date(`${day}T00:00:00Z`).toISOString();
 const day = (value?: string) => value?.slice(0, 10) ?? "";
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const dayOfMonth = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${dayOfMonth}`;
+};
 const displayDate = (value: string) => new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(value));
 const assetTypes = ["CASH", "INVESTMENT", "REAL_ESTATE", "VEHICLE", "BUSINESS", "OTHER"] as const;
 const liquidities = ["LIQUID", "SEMI_LIQUID", "ILLIQUID"] as const;
@@ -183,7 +188,7 @@ export default function EntryPage() {
   };
 
   const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
-  const baseCurrencyLocked = hasMonetaryFacts(assets, liabilities);
+  const baseCurrencyLocked = isSupportedCurrency(baseCurrency) && hasMonetaryFacts(assets, liabilities);
   const settingsComplete = Boolean(snapshotDate && isSupportedCurrency(baseCurrency));
   const assetsComplete = validAssets(assets, snapshotDate, baseCurrency);
   const liabilitiesComplete = validLiabilities(liabilities, snapshotDate, baseCurrency);
@@ -547,7 +552,12 @@ function hydrate(
 ) {
   const assetFacts = new Map((snapshot?.assets ?? []).map((fact) => [fact.id, fact]));
   const liabilityFacts = new Map((snapshot?.liabilities ?? []).map((fact) => [fact.id, fact]));
-  const currency = snapshot?.baseCurrency ?? snapshot?.assets?.[0]?.money?.currency ?? snapshot?.liabilities?.[0]?.money?.currency ?? "";
+  const factCurrencies = new Set([
+    ...(snapshot?.assets ?? []).map((fact) => fact.money?.currency),
+    ...(snapshot?.liabilities ?? []).map((fact) => fact.money?.currency),
+  ].filter((currency): currency is string => Boolean(currency)));
+  const inferredCurrency = factCurrencies.size === 1 ? factCurrencies.values().next().value ?? "" : "";
+  const currency = snapshot?.baseCurrency ?? inferredCurrency;
   setBaseCurrency(currency);
   setAssets(currentAssets.map((asset, index) => assetDraft(asset, assetFacts.get(asset.id), snapshot?.asOf, index)));
   setLiabilities(currentLiabilities.map((liability, index) => liabilityDraft(liability, liabilityFacts.get(liability.id), snapshot?.asOf, index)));
