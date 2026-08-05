@@ -2,21 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
-import { archiveAsset, archiveLiability, captureSnapshot, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
-import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
+import { archiveAsset, archiveLiability, captureSnapshot, getFxRates, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
+import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, FxRateItemResponse, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
 import { AppNavigation } from "../app-navigation";
 import { currencyName, isSupportedCurrency, parseAgentImport, supportedCurrencies } from "./import";
-import type { AgentImport, AgentImportAsset, AgentImportLiability, AgentImportManualConversion } from "./import";
+import type { AgentImport, AgentImportAsset, AgentImportLiability } from "./import";
 
 type AssetType = CaptureAssetRequest["type"];
 type Liquidity = CaptureAssetRequest["liquidity"];
-
-type ManualConversionDraft = {
-  originalAmount: string;
-  originalCurrency: string;
-  exchangeRateBasis: string;
-  effectiveDate: string;
-};
+type DeclaredRateDraft = { rate: string; rateDate: string; basis: string };
 
 type AssetDraft = {
   key: string;
@@ -25,9 +19,10 @@ type AssetDraft = {
   type: AssetType | "";
   liquidity: Liquidity | "";
   amount: string;
+  currency: string;
+  declaredRate?: DeclaredRateDraft;
   effectiveDate: string;
   source: string;
-  manualConversion?: ManualConversionDraft;
   carriedFrom?: string;
 };
 
@@ -36,9 +31,10 @@ type LiabilityDraft = {
   id?: string;
   name: string;
   amount: string;
+  currency: string;
+  declaredRate?: DeclaredRateDraft;
   effectiveDate: string;
   source: string;
-  manualConversion?: ManualConversionDraft;
   carriedFrom?: string;
 };
 
@@ -58,6 +54,7 @@ const displayDate = (value: string) => new Intl.DateTimeFormat("en-US", { dateSt
 const assetTypes = ["CASH", "INVESTMENT", "REAL_ESTATE", "VEHICLE", "BUSINESS", "OTHER"] as const;
 const liquidities = ["LIQUID", "SEMI_LIQUID", "ILLIQUID"] as const;
 const decimal = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+const positiveDecimal = /^(?:0\.\d*[1-9]\d*|[1-9]\d*(?:\.\d+)?)$/;
 
 export default function EntryPage() {
   const router = useRouter();
@@ -74,7 +71,7 @@ export default function EntryPage() {
   const [showValidation, setShowValidation] = useState(false);
   const [error, setError] = useState<string>();
   const [snapshotDate, setSnapshotDate] = useState(today);
-  const [baseCurrency, setBaseCurrency] = useState("");
+  const baseCurrency = "TWD";
   const [assets, setAssets] = useState<AssetDraft[]>([]);
   const [liabilities, setLiabilities] = useState<LiabilityDraft[]>([]);
   const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget>();
@@ -82,6 +79,8 @@ export default function EntryPage() {
   const [agentJson, setAgentJson] = useState("");
   const [importError, setImportError] = useState<string>();
   const [importReview, setImportReview] = useState<{ data: AgentImport; changes: string[] }>();
+  const [fxRates, setFxRates] = useState<FxRateItemResponse[]>([]);
+  const [missingCurrencies, setMissingCurrencies] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +91,7 @@ export default function EntryPage() {
         const latest = snapshotResponse.data?.at(-1);
         const saved = latest?.id ? (await getSnapshot({ path: { id: latest.id } })).data : undefined;
         if (cancelled) return;
-        hydrate(currentAssets, currentLiabilities, saved, setAssets, setLiabilities, setBaseCurrency);
+        hydrate(currentAssets, currentLiabilities, saved, setAssets, setLiabilities);
         setLoading(false);
       })
       .catch(() => {
@@ -117,14 +116,36 @@ export default function EntryPage() {
     (exact ?? candidates.find((element) => element.dataset.apiField === fallbackField) ?? formRef.current?.querySelector<HTMLElement>(".entry-step-panel h2"))?.focus();
   }, [apiFocus]);
 
+  const foreignCurrencies = [...new Set([...assets, ...liabilities].map((item) => item.currency).filter((currency) => currency && currency !== "TWD"))].sort();
+  const automaticCurrencies = [...new Set([...assets, ...liabilities].filter((item) => !item.declaredRate).map((item) => item.currency).filter((currency) => currency && currency !== "TWD"))].sort();
+  const foreignCurrencyKey = automaticCurrencies.join(",");
+  useEffect(() => {
+    if (mode !== "manual" || step !== "review" || !snapshotDate || !foreignCurrencyKey) {
+      setFxRates([]);
+      setMissingCurrencies([]);
+      return;
+    }
+    let cancelled = false;
+    getFxRates({ query: { asOf: snapshotDate, currencies: foreignCurrencyKey.split(",") } })
+      .then((response) => {
+        if (cancelled) return;
+        setFxRates(response.data?.rates ?? []);
+        setMissingCurrencies(response.data?.missingCurrencies ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setMissingCurrencies(foreignCurrencyKey.split(","));
+      });
+    return () => { cancelled = true; };
+  }, [foreignCurrencyKey, mode, snapshotDate, step]);
+
   const addAsset = () => {
     const key = `new-asset-${nextKey.current++}`;
-    setAssets((items) => [...items, { key, name: "", type: "", liquidity: "", amount: "", effectiveDate: snapshotDate, source: "" }]);
+    setAssets((items) => [...items, { key, name: "", type: "", liquidity: "", amount: "", currency: "TWD", effectiveDate: snapshotDate, source: "" }]);
   };
 
   const addLiability = () => {
     const key = `new-liability-${nextKey.current++}`;
-    setLiabilities((items) => [...items, { key, name: "", amount: "", effectiveDate: snapshotDate, source: "" }]);
+    setLiabilities((items) => [...items, { key, name: "", amount: "", currency: "TWD", effectiveDate: snapshotDate, source: "" }]);
   };
 
   const changeModeWithKeyboard = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -154,11 +175,12 @@ export default function EntryPage() {
   const previewImport = () => {
     setImportError(undefined);
     try {
-      const data = parseAgentImport(
+      const parsed = parseAgentImport(
         agentJson,
         new Set(assets.flatMap((item) => item.id ? [item.id] : [])),
         new Set(liabilities.flatMap((item) => item.id ? [item.id] : [])),
       );
+      const data = reconcileImportIds(parsed, assets, liabilities);
       if (data.baseCurrency !== baseCurrency) {
         throw new Error(`baseCurrency must match the shared Base currency ${baseCurrency}.`);
       }
@@ -188,8 +210,7 @@ export default function EntryPage() {
   };
 
   const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
-  const baseCurrencyLocked = isSupportedCurrency(baseCurrency) && hasMonetaryFacts(assets, liabilities);
-  const settingsComplete = Boolean(snapshotDate && isSupportedCurrency(baseCurrency));
+  const settingsComplete = Boolean(snapshotDate);
   const assetsComplete = validAssets(assets, snapshotDate, baseCurrency);
   const liabilitiesComplete = validLiabilities(liabilities, snapshotDate, baseCurrency);
 
@@ -213,26 +234,18 @@ export default function EntryPage() {
         name: asset.name,
         type: asset.type as AssetType,
         liquidity: asset.liquidity as Liquidity,
-        money: { amount: asset.amount, currency: baseCurrency },
+        originalMoney: { amount: asset.amount, currency: asset.currency },
+        ...(asset.declaredRate ? { declaredRate: asset.declaredRate } : {}),
         effectiveAt: instant(asset.effectiveDate),
         source: asset.source,
-        ...(asset.manualConversion ? { manualConversion: {
-          originalMoney: { amount: asset.manualConversion.originalAmount, currency: asset.manualConversion.originalCurrency },
-          exchangeRateBasis: asset.manualConversion.exchangeRateBasis,
-          effectiveAt: instant(asset.manualConversion.effectiveDate),
-        } } : {}),
       })),
       liabilities: liabilities.map((liability) => ({
         ...(liability.id ? { id: liability.id } : {}),
         name: liability.name,
-        money: { amount: liability.amount, currency: baseCurrency },
+        originalMoney: { amount: liability.amount, currency: liability.currency },
+        ...(liability.declaredRate ? { declaredRate: liability.declaredRate } : {}),
         effectiveAt: instant(liability.effectiveDate),
         source: liability.source,
-        ...(liability.manualConversion ? { manualConversion: {
-          originalMoney: { amount: liability.manualConversion.originalAmount, currency: liability.manualConversion.originalCurrency },
-          exchangeRateBasis: liability.manualConversion.exchangeRateBasis,
-          effectiveAt: instant(liability.manualConversion.effectiveDate),
-        } } : {}),
       })),
     };
     setSaving(true);
@@ -271,7 +284,7 @@ export default function EntryPage() {
           <div className="step-heading"><p className="eyebrow">Shared settings</p><h2 id="snapshot-context-title">Snapshot context</h2><p>These values apply to both AI-assisted import and manual entry.</p></div>
           <div className="entry-settings">
             <label>Snapshot date<input data-api-field="asOf" aria-label="Snapshot date" aria-invalid={showValidation && !snapshotDate || undefined} type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} required />{showValidation && !snapshotDate && <span className="field-error">Snapshot date is required.</span>}</label>
-            <div className="currency-field"><label htmlFor="base-currency">Base currency</label><BaseCurrencyCombobox value={baseCurrency} onChange={setBaseCurrency} disabled={baseCurrencyLocked} invalid={showValidation && !isSupportedCurrency(baseCurrency)} describedBy={baseCurrencyLocked ? "base-currency-locked" : showValidation && !baseCurrency ? "base-currency-error" : undefined} />{baseCurrencyLocked && <span id="base-currency-locked" className="field-help">Clear all position amounts before changing the base currency.</span>}{showValidation && !baseCurrency && <span id="base-currency-error" className="field-error">Base currency is required.</span>}{showValidation && baseCurrency && !isSupportedCurrency(baseCurrency) && <span className="field-error">Base currency must be a supported ISO 4217 currency.</span>}</div>
+            <label>Valuation currency<input aria-label="Valuation currency" value="TWD" disabled /><span className="field-help">All Snapshot totals are valued in TWD. Each position keeps its original currency.</span></label>
           </div>
         </section>
 
@@ -307,10 +320,17 @@ export default function EntryPage() {
           <div className="step-heading"><p className="eyebrow">Step 3 of 3</p><h2 id="review-step-title" tabIndex={-1}>Review and save</h2><p>Confirm the complete balance sheet before creating the immutable Snapshot.</p></div>
           <dl className="review-summary">
             <div><dt>Snapshot date</dt><dd>{snapshotDate || "Missing"}</dd></div>
-            <div><dt>Base currency</dt><dd>{baseCurrency || "Missing"}</dd></div>
+            <div><dt>Valuation currency</dt><dd>{baseCurrency}</dd></div>
             <div><dt>Assets</dt><dd>{assets.length}</dd></div>
             <div><dt>Liabilities</dt><dd>{liabilities.length}</dd></div>
           </dl>
+          {foreignCurrencies.length > 0 && <section className="fx-review" aria-labelledby="fx-review-title">
+            <h3 id="fx-review-title">FX valuation</h3>
+            <p>Official rates apply unless a position has an explicit declared-rate override.</p>
+            <ul>{fxRates.map((rate) => <li key={rate.originalCurrency}>{rate.originalCurrency} → TWD: {rate.rate} ({rate.provider}, {rate.rateDate ? displayDate(`${rate.rateDate}T00:00:00Z`) : "date unavailable"})</li>)}</ul>
+            <ul>{[...assets, ...liabilities].filter((item) => item.declaredRate).map((item) => <li key={item.key}>{item.name}: {item.currency} → TWD: {item.declaredRate!.rate || "rate missing"} (declared, {item.declaredRate!.rateDate ? displayDate(`${item.declaredRate!.rateDate}T00:00:00Z`) : "date missing"}; {item.declaredRate!.basis || "basis missing"})</li>)}</ul>
+            {missingCurrencies.length > 0 && <p className="review-warning">No official rate is available for: {missingCurrencies.join(", ")}.</p>}
+          </section>}
           {(!settingsComplete || !assetsComplete || !liabilitiesComplete) && <p className="review-warning">Some steps still contain missing or invalid values. Saving will take you to the first field to fix.</p>}
           <div className="step-actions"><button type="button" onClick={() => setStep("liabilities")}>Back</button><button className="primary-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Snapshot"}</button></div>
         </section>}
@@ -345,7 +365,7 @@ export default function EntryPage() {
   );
 }
 
-function BaseCurrencyCombobox({ value, onChange, disabled, invalid, describedBy }: { value: string; onChange: (currency: string) => void; disabled: boolean; invalid: boolean; describedBy?: string }) {
+function CurrencyCombobox({ id, apiField, label, value, onChange, invalid }: { id: string; apiField: string; label: string; value: string; onChange: (currency: string) => void; invalid: boolean }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -390,29 +410,27 @@ function BaseCurrencyCombobox({ value, onChange, disabled, invalid, describedBy 
   return <div className="currency-combobox">
     <input
       ref={inputRef}
-      id="base-currency"
-      data-api-field="baseCurrency"
+      id={id}
+      data-api-field={apiField}
       role="combobox"
-      aria-label="Base currency"
+      aria-label={label}
       aria-autocomplete="list"
       aria-expanded={open}
-      aria-controls="base-currency-options"
-      aria-activedescendant={activeCurrency ? `base-currency-${activeCurrency}` : undefined}
+      aria-controls={`${id}-options`}
+      aria-activedescendant={activeCurrency ? `${id}-${activeCurrency}` : undefined}
       aria-invalid={invalid || undefined}
-      aria-describedby={describedBy}
       value={value}
       onChange={(event) => { onChange(event.target.value.toUpperCase()); setOpen(true); setActiveIndex(-1); }}
-      onFocus={() => !disabled && setOpen(true)}
+      onFocus={() => setOpen(true)}
       onBlur={() => { setOpen(false); setActiveIndex(-1); }}
       onKeyDown={onKeyDown}
       autoComplete="off"
-      disabled={disabled}
       required
     />
-    {open && <div id="base-currency-options" className="currency-options" role="listbox" aria-label="Base currency suggestions">
+    {open && <div id={`${id}-options`} className="currency-options" role="listbox" aria-label="Currency suggestions">
       {matches.length ? matches.map((currency, index) => <button
         key={currency}
-        id={`base-currency-${currency}`}
+        id={`${id}-${currency}`}
         type="button"
         role="option"
         aria-label={`${currency} — ${currencyName(currency)}`}
@@ -489,16 +507,18 @@ function AssetFields({ index, draft, isNew, snapshotDate, baseCurrency, showVali
   const invalidType = showValidation && !draft.type;
   const invalidLiquidity = showValidation && !draft.liquidity;
   const invalidAmount = showValidation && !decimal.test(draft.amount);
+  const invalidCurrency = showValidation && !isSupportedCurrency(draft.currency);
   const invalidDate = showValidation && (!draft.effectiveDate || draft.effectiveDate > snapshotDate);
   const invalidSource = showValidation && !draft.source.trim();
   return <fieldset className="position-editor" aria-label={label}><legend>{label}</legend>
     <label>Name<input data-api-field={`assets[${index}].name`} aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
     <label>Type<select data-api-field={`assets[${index}].type`} aria-label={isNew ? "Type" : `${label} type`} aria-invalid={invalidType || undefined} value={draft.type} onChange={(event) => onChange({ ...draft, type: event.target.value as AssetType | "" })} required><option value="">Choose type</option>{assetTypes.map((value) => <option key={value}>{value}</option>)}</select>{invalidType && <span className="field-error">Type is required.</span>}</label>
     <label>Liquidity<select data-api-field={`assets[${index}].liquidity`} aria-label={isNew ? "Liquidity" : `${label} liquidity`} aria-invalid={invalidLiquidity || undefined} value={draft.liquidity} onChange={(event) => onChange({ ...draft, liquidity: event.target.value as Liquidity | "" })} required><option value="">Choose liquidity</option>{liquidities.map((value) => <option key={value}>{value}</option>)}</select>{invalidLiquidity && <span className="field-error">Liquidity is required.</span>}</label>
-    <label>Amount<input data-api-field={`assets[${index}].money.amount`} aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Amount<input data-api-field={`assets[${index}].originalMoney.amount`} aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Currency<CurrencyCombobox id={`asset-${index}-currency`} apiField={`assets[${index}].originalMoney.currency`} label={isNew ? "Currency" : `${label} currency`} invalid={Boolean(invalidCurrency)} value={draft.currency} onChange={(currency) => onChange({ ...draft, currency, ...(currency === "TWD" ? { declaredRate: undefined } : {}) })} />{invalidCurrency && <span className="field-error">Currency must be a supported ISO 4217 code.</span>}</label>
+    {draft.currency !== "TWD" && <DeclaredRateFields label={label} apiField={`assets[${index}].declaredRate`} value={draft.declaredRate} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(declaredRate) => onChange({ ...draft, declaredRate })} />}
     <label>Effective date<input data-api-field={`assets[${index}].effectiveAt`} aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
     <label>Source<input data-api-field={`assets[${index}].source`} aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
-    <ManualConversionFields label={label} apiField={`assets[${index}].manualConversion`} value={draft.manualConversion} baseCurrency={baseCurrency} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(manualConversion) => onChange({ ...draft, manualConversion })} />
     {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
     {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
   </fieldset>;
@@ -508,36 +528,31 @@ function LiabilityFields({ index, draft, isNew, snapshotDate, baseCurrency, show
   const label = isNew ? "New liability" : draft.name;
   const invalidName = showValidation && !draft.name.trim();
   const invalidAmount = showValidation && !decimal.test(draft.amount);
+  const invalidCurrency = showValidation && !isSupportedCurrency(draft.currency);
   const invalidDate = showValidation && (!draft.effectiveDate || draft.effectiveDate > snapshotDate);
   const invalidSource = showValidation && !draft.source.trim();
   return <fieldset className="position-editor" aria-label={label}><legend>{label}</legend>
     <label>Name<input data-api-field={`liabilities[${index}].name`} aria-label={isNew ? "Name" : `${label} name`} aria-invalid={invalidName || undefined} value={draft.name} maxLength={200} onChange={(event) => onChange({ ...draft, name: event.target.value })} required />{invalidName && <span className="field-error">Name is required.</span>}</label>
-    <label>Amount<input data-api-field={`liabilities[${index}].money.amount`} aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Amount<input data-api-field={`liabilities[${index}].originalMoney.amount`} aria-label={isNew ? "Amount" : `${label} amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={draft.amount} onChange={(event) => onChange({ ...draft, amount: event.target.value })} required />{invalidAmount && <span className="field-error">Amount must be a non-negative decimal.</span>}</label>
+    <label>Currency<CurrencyCombobox id={`liability-${index}-currency`} apiField={`liabilities[${index}].originalMoney.currency`} label={isNew ? "Currency" : `${label} currency`} invalid={Boolean(invalidCurrency)} value={draft.currency} onChange={(currency) => onChange({ ...draft, currency, ...(currency === "TWD" ? { declaredRate: undefined } : {}) })} />{invalidCurrency && <span className="field-error">Currency must be a supported ISO 4217 code.</span>}</label>
+    {draft.currency !== "TWD" && <DeclaredRateFields label={label} apiField={`liabilities[${index}].declaredRate`} value={draft.declaredRate} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(declaredRate) => onChange({ ...draft, declaredRate })} />}
     <label>Effective date<input data-api-field={`liabilities[${index}].effectiveAt`} aria-label={isNew ? "Effective date" : `${label} effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={draft.effectiveDate} onChange={(event) => onChange({ ...draft, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Effective date is required and cannot be after the Snapshot date.</span>}</label>
     <label>Source<input data-api-field={`liabilities[${index}].source`} aria-label={isNew ? "Source" : `${label} source`} aria-invalid={invalidSource || undefined} value={draft.source} maxLength={100} onChange={(event) => onChange({ ...draft, source: event.target.value })} required />{invalidSource && <span className="field-error">Source is required.</span>}</label>
-    <ManualConversionFields label={label} apiField={`liabilities[${index}].manualConversion`} value={draft.manualConversion} baseCurrency={baseCurrency} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(manualConversion) => onChange({ ...draft, manualConversion })} />
     {draft.carriedFrom && <p className="carried-note">Carried forward from {displayDate(draft.carriedFrom)}</p>}
     {onArchive && <button type="button" className="archive-action" aria-label={`Archive ${label}`} onClick={onArchive}>Archive</button>}
   </fieldset>;
 }
 
-function ManualConversionFields({ label, apiField, value, baseCurrency, snapshotDate, showValidation, onChange }: { label: string; apiField: string; value?: ManualConversionDraft; baseCurrency: string; snapshotDate: string; showValidation: boolean; onChange: (value?: ManualConversionDraft) => void }) {
-  const invalidAmount = showValidation && value && !decimal.test(value.originalAmount);
-  const invalidCurrency = showValidation && value && (!isSupportedCurrency(value.originalCurrency) || value.originalCurrency === baseCurrency);
-  const invalidBasis = showValidation && value && !value.exchangeRateBasis.trim();
-  const invalidDate = showValidation && value && (!value.effectiveDate || value.effectiveDate > snapshotDate);
+function DeclaredRateFields({ label, apiField, value, snapshotDate, showValidation, onChange }: { label: string; apiField: string; value?: DeclaredRateDraft; snapshotDate: string; showValidation: boolean; onChange: (value?: DeclaredRateDraft) => void }) {
+  const invalidRate = showValidation && value && !positiveDecimal.test(value.rate);
+  const invalidDate = showValidation && value && (!value.rateDate || value.rateDate > snapshotDate);
+  const invalidBasis = showValidation && value && !value.basis.trim();
   return <div className="manual-conversion">
-    <label className="checkbox-label"><input
-      aria-label={`${label} converted from another currency`}
-      type="checkbox"
-      checked={Boolean(value)}
-      onChange={(event) => onChange(event.target.checked ? { originalAmount: "", originalCurrency: "", exchangeRateBasis: "", effectiveDate: snapshotDate } : undefined)}
-    />Converted from another currency</label>
+    <label className="checkbox-label"><input aria-label={`${label} use declared rate`} type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked ? { rate: "", rateDate: snapshotDate, basis: "" } : undefined)} />Use declared rate instead of the official rate</label>
     {value && <div className="manual-conversion-fields">
-      <label>Original amount<input data-api-field={`${apiField}.originalMoney.amount`} aria-label={`${label} original amount`} aria-invalid={invalidAmount || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={value.originalAmount} onChange={(event) => onChange({ ...value, originalAmount: event.target.value })} required />{invalidAmount && <span className="field-error">Original amount must be a non-negative decimal.</span>}</label>
-      <label>Original currency<input data-api-field={`${apiField}.originalMoney.currency`} aria-label={`${label} original currency`} aria-invalid={invalidCurrency || undefined} value={value.originalCurrency} onChange={(event) => onChange({ ...value, originalCurrency: event.target.value.toUpperCase() })} maxLength={3} pattern="[A-Z]{3}" required />{invalidCurrency && <span className="field-error">Original currency must be a supported ISO 4217 code different from the base currency.</span>}</label>
-      <label>Exchange-rate basis<input data-api-field={`${apiField}.exchangeRateBasis`} aria-label={`${label} exchange-rate basis`} aria-invalid={invalidBasis || undefined} value={value.exchangeRateBasis} onChange={(event) => onChange({ ...value, exchangeRateBasis: event.target.value })} maxLength={200} required />{invalidBasis && <span className="field-error">Exchange-rate basis is required.</span>}</label>
-      <label>Conversion effective date<input data-api-field={`${apiField}.effectiveAt`} aria-label={`${label} conversion effective date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={value.effectiveDate} onChange={(event) => onChange({ ...value, effectiveDate: event.target.value })} required />{invalidDate && <span className="field-error">Conversion effective date is required and cannot be after the Snapshot date.</span>}</label>
+      <label>Rate<input data-api-field={`${apiField}.rate`} aria-label={`${label} declared rate`} aria-invalid={invalidRate || undefined} inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]+)?" value={value.rate} onChange={(event) => onChange({ ...value, rate: event.target.value })} required />{invalidRate && <span className="field-error">Rate must be a non-negative decimal.</span>}</label>
+      <label>Rate date<input data-api-field={`${apiField}.rateDate`} aria-label={`${label} rate date`} aria-invalid={invalidDate || undefined} type="date" max={snapshotDate} value={value.rateDate} onChange={(event) => onChange({ ...value, rateDate: event.target.value })} required />{invalidDate && <span className="field-error">Rate date is required and cannot be after the Snapshot date.</span>}</label>
+      <label>Rate basis<input data-api-field={`${apiField}.basis`} aria-label={`${label} rate basis`} aria-invalid={invalidBasis || undefined} value={value.basis} onChange={(event) => onChange({ ...value, basis: event.target.value })} maxLength={200} required />{invalidBasis && <span className="field-error">Rate basis is required.</span>}</label>
     </div>}
   </div>;
 }
@@ -548,40 +563,39 @@ function hydrate(
   snapshot: SnapshotResponse | undefined,
   setAssets: (items: AssetDraft[]) => void,
   setLiabilities: (items: LiabilityDraft[]) => void,
-  setBaseCurrency: (currency: string) => void,
 ) {
   const assetFacts = new Map((snapshot?.assets ?? []).map((fact) => [fact.id, fact]));
   const liabilityFacts = new Map((snapshot?.liabilities ?? []).map((fact) => [fact.id, fact]));
-  const factCurrencies = new Set([
-    ...(snapshot?.assets ?? []).map((fact) => fact.money?.currency),
-    ...(snapshot?.liabilities ?? []).map((fact) => fact.money?.currency),
-  ].filter((currency): currency is string => Boolean(currency)));
-  const inferredCurrency = factCurrencies.size === 1 ? factCurrencies.values().next().value ?? "" : "";
-  const currency = snapshot?.baseCurrency ?? inferredCurrency;
-  setBaseCurrency(currency);
   setAssets(currentAssets.map((asset, index) => assetDraft(asset, assetFacts.get(asset.id), snapshot?.asOf, index)));
   setLiabilities(currentLiabilities.map((liability, index) => liabilityDraft(liability, liabilityFacts.get(liability.id), snapshot?.asOf, index)));
 }
 
 function assetDraft(asset: AssetResponse, fact: AssetFactResponse | undefined, carriedFrom: string | undefined, index: number): AssetDraft {
-  return { key: asset.id ?? `asset-${index}`, id: asset.id, name: asset.name ?? "", type: assetTypes.find((value) => value === asset.type) ?? "", liquidity: liquidities.find((value) => value === asset.liquidity) ?? "", amount: fact?.money?.amount ?? "", effectiveDate: day(fact?.effectiveAt) || today(), source: fact?.source ?? "", manualConversion: conversionDraft(fact?.manualConversion), carriedFrom: fact ? carriedFrom : undefined };
+  const original = fact?.appliedConversion?.originalMoney ?? fact?.manualConversion?.originalMoney ?? fact?.money;
+  return { key: asset.id ?? `asset-${index}`, id: asset.id, name: asset.name ?? "", type: assetTypes.find((value) => value === asset.type) ?? "", liquidity: liquidities.find((value) => value === asset.liquidity) ?? "", amount: original?.amount ?? "", currency: original?.currency ?? "TWD", declaredRate: declaredRateDraft(fact), effectiveDate: day(fact?.effectiveAt) || today(), source: fact?.source ?? "", carriedFrom: fact ? carriedFrom : undefined };
 }
 
 function liabilityDraft(liability: LiabilityResponse, fact: LiabilityFactResponse | undefined, carriedFrom: string | undefined, index: number): LiabilityDraft {
-  return { key: liability.id ?? `liability-${index}`, id: liability.id, name: liability.name ?? "", amount: fact?.money?.amount ?? "", effectiveDate: day(fact?.effectiveAt) || today(), source: fact?.source ?? "", manualConversion: conversionDraft(fact?.manualConversion), carriedFrom: fact ? carriedFrom : undefined };
+  const original = fact?.appliedConversion?.originalMoney ?? fact?.manualConversion?.originalMoney ?? fact?.money;
+  return { key: liability.id ?? `liability-${index}`, id: liability.id, name: liability.name ?? "", amount: original?.amount ?? "", currency: original?.currency ?? "TWD", declaredRate: declaredRateDraft(fact), effectiveDate: day(fact?.effectiveAt) || today(), source: fact?.source ?? "", carriedFrom: fact ? carriedFrom : undefined };
 }
 
-function conversionDraft(conversion: AssetFactResponse["manualConversion"]): ManualConversionDraft | undefined {
-  if (!conversion) return undefined;
-  return { originalAmount: conversion.originalMoney?.amount ?? "", originalCurrency: conversion.originalMoney?.currency ?? "", exchangeRateBasis: conversion.exchangeRateBasis ?? "", effectiveDate: day(conversion.effectiveAt) };
+function declaredRateDraft(fact: AssetFactResponse | LiabilityFactResponse | undefined): DeclaredRateDraft | undefined {
+  const conversion = fact?.appliedConversion;
+  if (conversion?.rateType !== "USER_DECLARED" || !conversion.rate || !conversion.rateDate) return undefined;
+  return { rate: conversion.rate, rateDate: conversion.rateDate, basis: conversion.basis ?? "" };
+}
+
+function validDeclaredRate(value: DeclaredRateDraft | undefined, snapshotDate: string): boolean {
+  return !value || Boolean(positiveDecimal.test(value.rate) && value.rateDate && value.rateDate <= snapshotDate && value.basis.trim());
 }
 
 function validAssets(assets: AssetDraft[], snapshotDate: string, baseCurrency: string): boolean {
-  return assets.every((item) => Boolean(item.name.trim() && item.type && item.liquidity && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim() && validConversion(item.manualConversion, snapshotDate, baseCurrency)));
+  return assets.every((item) => Boolean(item.name.trim() && item.type && item.liquidity && decimal.test(item.amount) && isSupportedCurrency(item.currency) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim() && validDeclaredRate(item.declaredRate, snapshotDate)));
 }
 
 function validLiabilities(liabilities: LiabilityDraft[], snapshotDate: string, baseCurrency: string): boolean {
-  return liabilities.every((item) => Boolean(item.name.trim() && decimal.test(item.amount) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim() && validConversion(item.manualConversion, snapshotDate, baseCurrency)));
+  return liabilities.every((item) => Boolean(item.name.trim() && decimal.test(item.amount) && isSupportedCurrency(item.currency) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim() && validDeclaredRate(item.declaredRate, snapshotDate)));
 }
 
 function hasMonetaryFacts(assets: AssetDraft[], liabilities: LiabilityDraft[]): boolean {
@@ -593,33 +607,23 @@ function describeAssetUpdate(current: AssetDraft, imported: AgentImportAsset): s
     ["Name", current.name, imported.name],
     ["Type", current.type, imported.type],
     ["Liquidity", current.liquidity, imported.liquidity],
-    ["Amount", current.amount, imported.amount],
+    ["Amount", `${current.amount} ${current.currency}`, `${imported.amount} ${imported.currency}`],
     ["Effective date", current.effectiveDate, imported.effectiveDate],
     ["Source", current.source, imported.source],
-    ["Manual conversion", describeManualConversion(current.manualConversion), describeManualConversion(imported.manualConversion)],
   ]);
 }
 
 function describeLiabilityUpdate(current: LiabilityDraft, imported: AgentImportLiability): string[] {
   return describeChangedFields(`Liability ${current.name}`, [
     ["Name", current.name, imported.name],
-    ["Amount", current.amount, imported.amount],
+    ["Amount", `${current.amount} ${current.currency}`, `${imported.amount} ${imported.currency}`],
     ["Effective date", current.effectiveDate, imported.effectiveDate],
     ["Source", current.source, imported.source],
-    ["Manual conversion", describeManualConversion(current.manualConversion), describeManualConversion(imported.manualConversion)],
   ]);
 }
 
 function describeChangedFields(subject: string, fields: Array<[string, string, string]>): string[] {
   return fields.flatMap(([label, before, after]) => before === after ? [] : [`${subject} — ${label}: ${before} → ${after}`]);
-}
-
-function describeManualConversion(value?: ManualConversionDraft | AgentImportManualConversion): string {
-  return value ? `${value.originalAmount} ${value.originalCurrency}; ${value.exchangeRateBasis}; effective ${value.effectiveDate}` : "None";
-}
-
-function validConversion(value: ManualConversionDraft | undefined, snapshotDate: string, baseCurrency: string): boolean {
-  return !value || Boolean(decimal.test(value.originalAmount) && isSupportedCurrency(value.originalCurrency) && value.originalCurrency !== baseCurrency && value.exchangeRateBasis.trim() && value.effectiveDate && value.effectiveDate <= snapshotDate);
 }
 
 function stepForApiField(field: string): EntryStep {
@@ -632,8 +636,8 @@ function formatApiError(error: { field?: string; message?: string }): string {
   const field = error.field ?? "request";
   const collection = field.match(/^(assets|liabilities)\[(\d+)](?:\.(.+))?$/);
   const suffix = collection?.[3]
-    ?.replace("money.amount", "amount")
-    .replace("money.currency", "currency")
+    ?.replace("originalMoney.amount", "amount")
+    .replace("originalMoney.currency", "currency")
     .replace("effectiveAt", "effective date")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .toLowerCase();
@@ -653,53 +657,72 @@ function mergeAssets(current: AssetDraft[], imported: AgentImport, nextKey: { cu
   const updates = new Map(imported.assets.flatMap((item) => item.id ? [[item.id, item] as const] : []));
   const updated = current.map((draft) => {
     const item = draft.id ? updates.get(draft.id) : undefined;
-    return item ? { ...draft, name: item.name, type: item.type, liquidity: item.liquidity, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source, manualConversion: item.manualConversion, carriedFrom: undefined } : draft;
+    return item ? { ...draft, name: item.name, type: item.type, liquidity: item.liquidity, amount: item.amount, currency: item.currency, effectiveDate: item.effectiveDate, source: item.source, carriedFrom: undefined } : draft;
   });
-  const additions = imported.assets.filter((item) => !item.id).map((item) => ({ key: `imported-asset-${nextKey.current++}`, name: item.name, type: item.type, liquidity: item.liquidity, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source, manualConversion: item.manualConversion }));
+  const additions = imported.assets.filter((item) => !item.id).map((item) => ({ key: `imported-asset-${nextKey.current++}`, name: item.name, type: item.type, liquidity: item.liquidity, amount: item.amount, currency: item.currency, effectiveDate: item.effectiveDate, source: item.source }));
   return [...updated, ...additions];
+}
+
+function reconcileImportIds(imported: AgentImport, assets: AssetDraft[], liabilities: LiabilityDraft[]): AgentImport {
+  const reconcile = <T extends { id?: string; name: string }>(items: T[], current: Array<{ id?: string; name: string }>, kind: string): T[] => {
+    const idsByName = new Map<string, string[]>();
+    for (const item of current) {
+      if (!item.id) continue;
+      const ids = idsByName.get(item.name) ?? [];
+      ids.push(item.id);
+      idsByName.set(item.name, ids);
+    }
+    const resolved = items.map((item) => {
+      if (item.id) return item;
+      const ids = idsByName.get(item.name);
+      return ids?.length === 1 ? { ...item, id: ids[0] } : item;
+    });
+    const usedIds = resolved.flatMap((item) => item.id ? [item.id] : []);
+    if (new Set(usedIds).size !== usedIds.length) throw new Error(`Import contains the same existing ${kind} more than once.`);
+    return resolved;
+  };
+  return { ...imported, assets: reconcile(imported.assets, assets, "asset"), liabilities: reconcile(imported.liabilities, liabilities, "liability") };
 }
 
 function mergeLiabilities(current: LiabilityDraft[], imported: AgentImport, nextKey: { current: number }): LiabilityDraft[] {
   const updates = new Map(imported.liabilities.flatMap((item) => item.id ? [[item.id, item] as const] : []));
   const updated = current.map((draft) => {
     const item = draft.id ? updates.get(draft.id) : undefined;
-    return item ? { ...draft, name: item.name, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source, manualConversion: item.manualConversion, carriedFrom: undefined } : draft;
+    return item ? { ...draft, name: item.name, amount: item.amount, currency: item.currency, effectiveDate: item.effectiveDate, source: item.source, carriedFrom: undefined } : draft;
   });
-  const additions = imported.liabilities.filter((item) => !item.id).map((item) => ({ key: `imported-liability-${nextKey.current++}`, name: item.name, amount: item.amount, effectiveDate: item.effectiveDate, source: item.source, manualConversion: item.manualConversion }));
+  const additions = imported.liabilities.filter((item) => !item.id).map((item) => ({ key: `imported-liability-${nextKey.current++}`, name: item.name, amount: item.amount, currency: item.currency, effectiveDate: item.effectiveDate, source: item.source }));
   return [...updated, ...additions];
 }
 
 function buildPrompt(includeDraft: boolean, snapshotDate: string, baseCurrency: string, assets: AssetDraft[], liabilities: LiabilityDraft[]): string {
-  const contextReady = isSupportedCurrency(baseCurrency) && Boolean(snapshotDate);
-  const exampleBaseCurrency = contextReady ? baseCurrency : "TWD";
-  const exampleOriginalCurrency = exampleBaseCurrency === "USD" ? "EUR" : "USD";
+  const contextReady = Boolean(snapshotDate);
   const shape = {
-    schemaVersion: 1,
-    baseCurrency: exampleBaseCurrency,
+    schemaVersion: 2,
+    baseCurrency: "TWD",
     snapshotDate: snapshotDate || "YYYY-MM-DD",
-    assets: [{ name: "Example foreign-currency asset", type: "CASH", liquidity: "LIQUID", amount: "1250.00", effectiveDate: snapshotDate, source: "Statement description", manualConversion: { originalAmount: "1000.00", originalCurrency: exampleOriginalCurrency, exchangeRateBasis: `Declared ${exampleOriginalCurrency}/${exampleBaseCurrency} rate 1.25`, effectiveDate: snapshotDate } }],
-    liabilities: [{ name: "Example liability", amount: "250.00", effectiveDate: snapshotDate, source: "Statement description" }],
+    assets: [{ name: "Example USD account", type: "CASH", liquidity: "LIQUID", amount: "1000.00", currency: "USD", effectiveDate: snapshotDate || "YYYY-MM-DD", source: "Statement description" }],
+    liabilities: [{ name: "Example liability", amount: "250.00", currency: "TWD", effectiveDate: snapshotDate || "YYYY-MM-DD", source: "Statement description" }],
   };
   const instructions = [
     "You are conducting a complete personal balance-sheet inventory interview. Do not assume the user's first answer is the full inventory.",
     "Ask one concise question at a time and wait for the user's answer before continuing.",
     contextReady
-      ? `Use this exact Snapshot context: Base currency ${baseCurrency}; Snapshot date ${snapshotDate}. Do not ask the user to choose different values, and return these exact values in the final JSON.`
-      : "Set a valid Base currency in Wealth OS before using this Prompt.",
+      ? `Use this exact Snapshot context: Valuation currency TWD; Snapshot date ${snapshotDate}. Return these exact values in the final JSON.`
+      : "The valuation currency is fixed to TWD. Ask for the Snapshot date before returning JSON.",
     "Explicitly cover every asset category: Cash and bank accounts; Investments and retirement accounts; Real estate; Vehicles; Business ownership; and Other assets such as valuables or receivables. Ask about every category even when the user has not mentioned it.",
     "Explicitly cover Mortgages, credit cards, personal or business loans, taxes owed, and other liabilities. Ask whether jointly held, foreign-currency, or easily forgotten positions remain.",
-    "For every asset, collect name, amount, effective date, source, type, and liquidity. For every liability, collect name, amount, effective date, and source. Ask follow-up questions whenever a required value is missing.",
-    "For each foreign-currency position, manually convert it to the base currency. Put the converted value in amount and include manualConversion with originalAmount, originalCurrency, exchangeRateBasis, and effectiveDate. Omit manualConversion for positions already expressed in the base currency.",
+    "For every asset, collect name, original amount, original currency, effective date, source, type, and liquidity. For every liability, collect name, original amount, original currency, effective date, and source. Ask follow-up questions whenever a required value is missing.",
+    "Keep each amount in the currency reported by the user. Do not calculate or invent an exchange rate, and do not convert amounts to TWD. Wealth OS performs valuation after import.",
     "Use type CASH, INVESTMENT, REAL_ESTATE, VEHICLE, BUSINESS, or OTHER. Use liquidity LIQUID, SEMI_LIQUID, or ILLIQUID based on how readily the asset can be converted to cash.",
     "Summarize the inventory and ask the user to confirm that it is complete. Do not return the final JSON until the user confirms the inventory is complete.",
     "After confirmation, return only valid JSON matching this schema. Do not add Markdown or explanations to the final response.",
-    "schemaVersion must be 1. Preserve every provided id exactly; omit id for new positions and never invent one.",
+    "schemaVersion must be 2 and baseCurrency must be TWD. Preserve every provided id exactly; omit id for new positions and never invent one.",
     "Amounts must be non-negative decimal strings. Dates must be YYYY-MM-DD. Do not add unknown fields or archive instructions.",
     `FORMAT EXAMPLE:\n${JSON.stringify(shape, null, 2)}`,
   ];
   if (includeDraft) {
     instructions.push("Treat CURRENT_DRAFT as the starting inventory. Verify every existing position, preserve each provided id exactly, and continue interviewing for missing positions.");
-    instructions.push(`CURRENT_DRAFT:\n${JSON.stringify({ schemaVersion: 1, baseCurrency, snapshotDate, assets: assets.map(({ id, name, type, liquidity, amount, effectiveDate, source, manualConversion }) => ({ ...(id ? { id } : {}), name, type, liquidity, amount, effectiveDate, source, ...(manualConversion ? { manualConversion } : {}) })), liabilities: liabilities.map(({ id, name, amount, effectiveDate, source, manualConversion }) => ({ ...(id ? { id } : {}), name, amount, effectiveDate, source, ...(manualConversion ? { manualConversion } : {}) })) }, null, 2)}`);
+    instructions.push(`CURRENT_DRAFT:\n${JSON.stringify({ schemaVersion: 2, baseCurrency: "TWD", snapshotDate, assets: assets.map(({ id, name, type, liquidity, amount, currency, effectiveDate, source }) => ({ ...(id ? { id } : {}), name, type, liquidity, amount, currency, effectiveDate, source })), liabilities: liabilities.map(({ id, name, amount, currency, effectiveDate, source }) => ({ ...(id ? { id } : {}), name, amount, currency, effectiveDate, source })) }, null, 2)}`);
   }
   return instructions.join("\n\n");
 }
