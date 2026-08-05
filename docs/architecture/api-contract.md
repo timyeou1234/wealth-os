@@ -155,6 +155,22 @@ never executed or inserted as HTML. Server validation remains authoritative.
 
 ## Security boundary
 
-The first API is for local development and a single-user product. Authentication and the
-deployment threat model remain undecided. Swagger UI and product endpoints must not be
-made publicly reachable with real financial data until those decisions are implemented.
+- Personal financial endpoints require an OAuth Bearer access token issued for the Wealth
+  OS user API. Missing or invalid authentication returns `401`.
+- Spring derives the local User from validated issuer and subject claims. Product request
+  paths, query parameters, and bodies never accept an owner identifier.
+- A valid caller requesting another owner's Asset, Liability, Snapshot, correction,
+  comparison, or derived view receives the same `404` representation as a missing
+  resource.
+- Official FX reads require an authenticated user but remain shared reference data.
+- `POST /api/v1/fx-rates/sync` requires an approved machine access token with `fx:sync`.
+  A human product token cannot receive this authority. The in-process scheduler invokes
+  the synchronization use case directly and does not call its own HTTP endpoint.
+- Browser product traffic uses same-origin Next.js BFF routes. The BFF obtains the user
+  access token from its Redis-backed server session and never returns it to client code.
+- Authentication endpoints use an opaque HttpOnly cookie with `Secure` in HTTPS
+  environments and an explicit SameSite policy. Mutating BFF routes also enforce origin
+  and CSRF protections.
+- Production does not expose Spring or Swagger publicly. Development Swagger may use a
+  dedicated development OAuth client; production Swagger is disabled.
+- OpenAPI declares separate user Bearer and operational M2M security requirements.

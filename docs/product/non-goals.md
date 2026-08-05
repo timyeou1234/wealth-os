@@ -89,7 +89,12 @@ The MVP does not include:
 - Full Account, Holding, and security-instrument domain models
 
 The initial product is a single-user web application focused on the project creator as the
-first customer.
+first customer. Authentication and owner isolation still apply: "single-user" describes
+the product audience, not a permission to expose one global dataset.
+
+The first authenticated release does not include public registration, passwords managed
+by Wealth OS, additional social identity providers, account recovery, household sharing,
+advisor access, a front-end administrator role, or an administrator UI.
 
 ## Engineering exclusions
 

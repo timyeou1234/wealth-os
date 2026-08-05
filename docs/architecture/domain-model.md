@@ -12,6 +12,11 @@ shared
 ├── Currency
 └── Money
 
+identity
+├── User (entity)
+├── UserId
+└── ExternalIdentity (issuer + subject)
+
 asset
 ├── Asset (entity)
 ├── AssetId
@@ -72,6 +77,21 @@ conversion remains temporarily available until the Input UI migrates:
 
 Asset, Liability, and Snapshot are entities. Equality is based on their UUID-backed
 identity rather than mutable descriptive attributes.
+
+Authentication claims do not enter financial domain entities. The identity application
+boundary validates an external issuer and subject, resolves them to a local `UserId`, and
+makes that current owner available to financial application use cases. Email is verified
+allowlist and display metadata; it is not a stable domain identity.
+
+Asset, Liability, and Snapshot persistence is partitioned by local `UserId`. HTTP clients
+never supply that owner. Application services receive it only from the authenticated
+security context, and financial repositories require it for every lookup and mutation.
+Cross-owner identifiers are indistinguishable from missing identifiers. Snapshot
+positions remain self-contained financial facts, while Snapshot ownership controls who
+may load the aggregate; ownership is not duplicated into each immutable line item.
+
+Official FX rates are system reference data and have no user owner. A user-declared rate
+is evidence inside an owned Snapshot position and therefore inherits Snapshot access.
 
 ## Time
 
