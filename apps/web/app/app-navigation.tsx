@@ -5,6 +5,7 @@ export function AppNavigation({ current }: { current: "dashboard" | "input" }) {
     <nav className="app-navigation" aria-label="Primary">
       <Link href="/" aria-current={current === "dashboard" ? "page" : undefined}>Dashboard</Link>
       <Link href="/entry" aria-current={current === "input" ? "page" : undefined}>Input</Link>
+      <a className="sign-out" href="/auth/logout">Sign out</a>
     </nav>
   );
 }

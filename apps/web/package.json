@@ -9,9 +9,11 @@
     "api:generate": "openapi-ts -i http://localhost:8080/v3/api-docs -o app/api/generated -c @hey-api/client-fetch"
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "4.26.0",
     "next": "16.1.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "redis": "6.2.0"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",

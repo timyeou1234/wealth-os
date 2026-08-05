@@ -29,6 +29,7 @@ describe("Dashboard", () => {
     const navigation = screen.getByRole("navigation", { name: "Primary" });
     expect(screen.getByRole("link", { name: "Dashboard" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "Input" }).getAttribute("href")).toBe("/entry");
+    expect(screen.getByRole("link", { name: "Sign out" }).getAttribute("href")).toBe("/auth/logout");
     expect(navigation).toBeTruthy();
   });
 
