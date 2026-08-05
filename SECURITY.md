@@ -24,3 +24,16 @@ other personal data.
 
 Supported-version and disclosure timelines will be defined before the first public
 release.
+
+## Credentials and secret response
+
+Store local credentials only in ignored `.env` files. Commit placeholder-only
+`.env.example` files so required variable names remain documented. Never place secrets
+in client-exposed variables, build arguments, test fixtures, logs, screenshots, or CI
+artifacts.
+
+If a secret may have been exposed, treat it as compromised: revoke or rotate it at the
+provider first, remove it from every active environment, update the affected deployment,
+and review provider and application audit logs. Removing a value from the latest Git
+commit does not remove it from history. Coordinate any history rewrite privately after
+rotation, then invalidate old clones and caches as appropriate.
