@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.get
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=none",
+        "spring.profiles.active=local",
+        "WEALTHOS_SWAGGER_ENABLED=true",
     ],
 )
 @AutoConfigureMockMvc
@@ -29,6 +31,20 @@ class ApiDocumentationConfigurationTest {
                 content { contentType("application/json") }
                 content { string(containsString("\"title\":\"Wealth OS API\"")) }
                 content { string(containsString("\"version\":\"v1\"")) }
+            }
+    }
+
+    @Test
+    fun `documents separate user and operational authentication boundaries`() {
+        mockMvc.get("/v3/api-docs")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.components.securitySchemes.userBearer.type") { value("http") }
+                jsonPath("$.components.securitySchemes.userBearer.scheme") { value("bearer") }
+                jsonPath("$.components.securitySchemes.operationalM2mBearer.type") { value("http") }
+                jsonPath("$.components.securitySchemes.operationalM2mBearer.scheme") { value("bearer") }
+                jsonPath("$.security[0].userBearer") { exists() }
+                jsonPath("$.paths['/api/v1/fx-rates/sync'].post.security[0].operationalM2mBearer") { exists() }
             }
     }
 

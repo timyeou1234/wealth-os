@@ -5,17 +5,23 @@ import com.wealthos.asset.domain.AssetId
 import com.wealthos.asset.domain.AssetRepository
 import com.wealthos.asset.domain.AssetType
 import com.wealthos.asset.domain.Liquidity
+import com.wealthos.identity.application.CurrentUserIdProvider
+import com.wealthos.identity.domain.UserId
 import org.hamcrest.Matchers.matchesPattern
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -25,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional
         "spring.jpa.hibernate.ddl-auto=create-drop",
     ],
 )
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @Transactional
 class AssetControllerTest {
     @Autowired
@@ -34,10 +40,21 @@ class AssetControllerTest {
     @Autowired
     private lateinit var assetRepository: AssetRepository
 
+    @MockitoBean
+    private lateinit var currentUser: CurrentUserIdProvider
+
+    private val ownerId = UserId(UUID.fromString("0d7df138-40f2-4a54-b06a-1216ef2d8801"))
+
+    @BeforeEach
+    fun provideCurrentUser() {
+        `when`(currentUser.get()).thenReturn(ownerId)
+    }
+
     @Test
     fun `lists assets as transport responses`() {
         val home =
             assetRepository.save(
+                ownerId,
                 Asset(
                     id = AssetId.new(),
                     name = "Home",
@@ -47,6 +64,7 @@ class AssetControllerTest {
             )
         val cash =
             assetRepository.save(
+                ownerId,
                 Asset(
                     id = AssetId.new(),
                     name = "Cash",
@@ -116,6 +134,7 @@ class AssetControllerTest {
     fun `user can update an asset metadata`() {
         val asset =
             assetRepository.save(
+                ownerId,
                 Asset(AssetId.new(), "Savings", AssetType.CASH, Liquidity.LIQUID),
             )
 
@@ -150,6 +169,7 @@ class AssetControllerTest {
     fun `user can archive an asset without removing its resource`() {
         val asset =
             assetRepository.save(
+                ownerId,
                 Asset(AssetId.new(), "Old Account", AssetType.CASH, Liquidity.LIQUID),
             )
 

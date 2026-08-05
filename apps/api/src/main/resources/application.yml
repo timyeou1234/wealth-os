@@ -1,4 +1,10 @@
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${WEALTHOS_AUTH_ISSUER_URI}
+          audiences: ${WEALTHOS_AUTH_AUDIENCE}
   datasource:
     url: ${WEALTHOS_DATABASE_URL:jdbc:postgresql://localhost:5432/wealthos}
     username: ${WEALTHOS_DATABASE_USERNAME:wealthos}
@@ -14,7 +20,16 @@ spring:
         jdbc:
           time_zone: UTC
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 wealthos:
+  auth:
+    allowed-emails: ${WEALTHOS_ALLOWED_EMAILS}
+    fx-sync-client-id: ${WEALTHOS_FX_SYNC_CLIENT_ID}
   fx:
     scheduling-enabled: ${WEALTHOS_FX_SCHEDULING_ENABLED:true}
     frankfurter-base-url: ${WEALTHOS_FRANKFURTER_BASE_URL:https://api.frankfurter.dev}

@@ -1,9 +1,17 @@
 package com.wealthos.domain.liability
 
+import com.wealthos.identity.domain.UserId
+
 interface LiabilityRepository {
-    fun save(liability: Liability): Liability
+    fun save(
+        ownerId: UserId,
+        liability: Liability,
+    ): Liability
 
-    fun findById(id: LiabilityId): Liability?
+    fun findById(
+        ownerId: UserId,
+        id: LiabilityId,
+    ): Liability?
 
-    fun findAll(): List<Liability>
+    fun findAll(ownerId: UserId): List<Liability>
 }

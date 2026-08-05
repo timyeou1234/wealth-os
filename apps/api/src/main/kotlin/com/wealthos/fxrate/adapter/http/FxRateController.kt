@@ -1,5 +1,6 @@
 package com.wealthos.fxrate.adapter.http
 
+import com.wealthos.configuration.ApiDocumentationConfiguration
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.CanonicalValuationCurrency
 import com.wealthos.fxrate.application.GetFxRates
@@ -8,6 +9,7 @@ import com.wealthos.shared.application.RequestValidationException
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.web.bind.annotation.GetMapping
@@ -60,6 +62,7 @@ class FxRateController(
 
     @PostMapping("/sync")
     @Operation(summary = "Synchronize CBC foreign-exchange rates", operationId = "syncFxRates")
+    @SecurityRequirement(name = ApiDocumentationConfiguration.OPERATIONAL_M2M_BEARER)
     fun sync(
         @RequestBody(required = false) request: FxRateSyncRequest?,
     ): FxRateSyncResponse {

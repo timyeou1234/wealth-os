@@ -1,16 +1,22 @@
 package com.wealthos.liability.adapter.http
 
+import com.wealthos.identity.application.CurrentUserIdProvider
+import com.wealthos.identity.domain.UserId
 import org.hamcrest.Matchers.matchesPattern
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -20,11 +26,21 @@ import org.springframework.transaction.annotation.Transactional
         "spring.jpa.hibernate.ddl-auto=create-drop",
     ],
 )
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @Transactional
 class LiabilityControllerTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @MockitoBean
+    private lateinit var currentUser: CurrentUserIdProvider
+
+    @BeforeEach
+    fun provideCurrentUser() {
+        `when`(currentUser.get()).thenReturn(
+            UserId(UUID.fromString("3f1455cc-5a59-4510-9eae-ee75e68bbf79")),
+        )
+    }
 
     @Test
     fun `lists liabilities as transport responses`() {

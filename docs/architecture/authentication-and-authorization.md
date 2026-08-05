@@ -50,6 +50,12 @@ The backend repeats the allowlist decision during local User provisioning. A ver
 email is allowlist and display metadata only; issuer plus subject is the stable external
 identity. A rejected or unverified identity creates no local User.
 
+The Auth0 user access token supplied to Spring therefore includes `email` and the boolean
+`email_verified` claims in addition to issuer and subject. The backend compares the email
+case-insensitively with the server-side allowlist, then keys the local User only by issuer
+plus subject. Production and development Actions, claim configuration, and allowlists are
+environment-specific.
+
 ## Server-side session
 
 The BFF uses the Auth0 Next.js SDK with a custom Redis session store. The default complete

@@ -19,6 +19,8 @@ import com.wealthos.domain.shared.AppliedConversion
 import com.wealthos.domain.shared.CanonicalValuationCurrency
 import com.wealthos.domain.shared.FxRateType
 import com.wealthos.fxrate.application.GetFxRates
+import com.wealthos.identity.application.CurrentUserIdProvider
+import com.wealthos.identity.domain.UserId
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotRepository
@@ -34,26 +36,28 @@ class CaptureSnapshot(
     private val liabilities: LiabilityRepository,
     private val snapshots: SnapshotRepository,
     private val getFxRates: GetFxRates,
+    private val currentUser: CurrentUserIdProvider,
 ) {
     @Transactional
     fun execute(command: CaptureSnapshotCommand): Snapshot {
         if (command.recordedAt.isBefore(command.asOf)) {
             throw RequestValidationException("recordedAt", "must not be before asOf")
         }
-        val activeAssets = assets.findAll().filterNot(Asset::archived)
-        val activeLiabilities = liabilities.findAll().filterNot(Liability::archived)
-        validateAssetIds(command.assets)
-        validateLiabilityIds(command.liabilities)
+        val ownerId = currentUser.get()
+        val activeAssets = assets.findAll(ownerId).filterNot(Asset::archived)
+        val activeLiabilities = liabilities.findAll(ownerId).filterNot(Liability::archived)
+        validateAssetIds(ownerId, command.assets)
+        validateLiabilityIds(ownerId, command.liabilities)
         requireCompleteActiveSet(activeAssets.map(Asset::id).toSet(), command.assets.mapNotNull(CaptureAsset::id), "assets", "asset")
         requireCompleteActiveSet(activeLiabilities.map(Liability::id).toSet(), command.liabilities.mapNotNull(CaptureLiability::id), "liabilities", "liability")
 
         val capturedAssets =
             command.assets.map { input ->
-                assets.save(Asset(input.id ?: AssetId.new(), input.name, input.type, input.liquidity))
+                assets.save(ownerId, Asset(input.id ?: AssetId.new(), input.name, input.type, input.liquidity))
             }
         val capturedLiabilities =
             command.liabilities.map { input ->
-                liabilities.save(Liability(input.id ?: LiabilityId.new(), input.name))
+                liabilities.save(ownerId, Liability(input.id ?: LiabilityId.new(), input.name))
             }
 
         val snapshot =
@@ -75,7 +79,7 @@ class CaptureSnapshot(
                         LiabilityBalance(liability.id, fact.money, input.effectiveAt, input.source, input.manualConversion, fact.appliedConversion)
                     },
             )
-        return snapshots.save(snapshot)
+        return snapshots.save(ownerId, snapshot)
     }
 
     private fun <T> requireCompleteActiveSet(
@@ -92,20 +96,26 @@ class CaptureSnapshot(
         }
     }
 
-    private fun validateAssetIds(inputs: List<CaptureAsset>) {
+    private fun validateAssetIds(
+        ownerId: UserId,
+        inputs: List<CaptureAsset>,
+    ) {
         inputs.forEachIndexed { index, input ->
             input.id?.let { id ->
-                if (assets.findById(id)?.archived != false) {
+                if (assets.findById(ownerId, id)?.archived != false) {
                     throw RequestValidationException("assets[$index].id", "must identify an active asset")
                 }
             }
         }
     }
 
-    private fun validateLiabilityIds(inputs: List<CaptureLiability>) {
+    private fun validateLiabilityIds(
+        ownerId: UserId,
+        inputs: List<CaptureLiability>,
+    ) {
         inputs.forEachIndexed { index, input ->
             input.id?.let { id ->
-                if (liabilities.findById(id)?.archived != false) {
+                if (liabilities.findById(ownerId, id)?.archived != false) {
                     throw RequestValidationException("liabilities[$index].id", "must identify an active liability")
                 }
             }

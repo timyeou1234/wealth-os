@@ -1,9 +1,17 @@
 package com.wealthos.asset.domain
 
+import com.wealthos.identity.domain.UserId
+
 interface AssetRepository {
-    fun save(asset: Asset): Asset
+    fun save(
+        ownerId: UserId,
+        asset: Asset,
+    ): Asset
 
-    fun findById(id: AssetId): Asset?
+    fun findById(
+        ownerId: UserId,
+        id: AssetId,
+    ): Asset?
 
-    fun findAll(): List<Asset>
+    fun findAll(ownerId: UserId): List<Asset>
 }

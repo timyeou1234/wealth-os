@@ -17,8 +17,10 @@ import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotAssetPosition
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotLiabilityPosition
+import com.wealthos.identity.domain.UserId
 import java.math.BigDecimal
 import java.time.Instant
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -61,7 +63,11 @@ class SnapshotPersistenceMapperTest {
 
         val restored =
             SnapshotPersistenceMapper.domain(
-                snapshot = SnapshotPersistenceMapper.snapshotEntity(corrected),
+                snapshot =
+                    SnapshotPersistenceMapper.snapshotEntity(
+                        UserId(UUID.fromString("fb1f915d-9485-433d-9dc1-227bf8c88154")),
+                        corrected,
+                    ),
                 assets = SnapshotPersistenceMapper.assetEntities(corrected),
                 liabilities = SnapshotPersistenceMapper.liabilityEntities(corrected),
             )

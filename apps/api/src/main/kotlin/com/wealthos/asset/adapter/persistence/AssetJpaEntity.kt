@@ -11,6 +11,8 @@ import java.util.UUID
 class AssetJpaEntity(
     @Id
     val id: UUID,
+    @Column(name = "owner_id", nullable = false)
+    val ownerId: UUID,
     @Column(nullable = false)
     val name: String,
     @Column(name = "asset_type", nullable = false)
