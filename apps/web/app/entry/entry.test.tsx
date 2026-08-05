@@ -25,7 +25,7 @@ beforeEach(() => {
     assets: [{ id: assetId, name: "Cash", type: "CASH", liquidity: "LIQUID", money: { amount: "1000.00", currency: "TWD" }, effectiveAt: "2026-07-30T00:00:00Z", source: "Bank statement" }], liabilities: [],
   } });
   api.captureSnapshot.mockResolvedValue({ data: { id: "snapshot-created" } });
-  api.getFxRates.mockResolvedValue({ data: { valuationCurrency: "TWD", asOf: "2026-08-02", rates: [{ originalCurrency: "USD", rate: "32.1", rateDate: "2026-08-01", provider: "CBC", rateType: "CLOSING_SPOT" }], missingCurrencies: [] } });
+  api.getFxRates.mockResolvedValue({ data: { valuationCurrency: "TWD", asOf: "2026-08-02", rates: [{ originalCurrency: "USD", rate: "32.1", rateDate: "2026-08-01", provider: "CBC", rateType: "REFERENCE_RATE" }], missingCurrencies: [] } });
   api.archiveAsset.mockResolvedValue({});
   api.archiveLiability.mockResolvedValue({});
 });
@@ -89,7 +89,9 @@ describe("Balance-sheet entry", () => {
     expect(screen.getByText("Asset Cash — Amount: 1000.00 TWD → 1200 USD")).toBeTruthy();
     expect(screen.queryByText("Add asset: Cash")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Apply import" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
+    const save = screen.getByRole("button", { name: "Save Snapshot" }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
     await waitFor(() => expect(api.captureSnapshot).toHaveBeenCalledOnce());
     expect(api.captureSnapshot.mock.calls[0][0].body.assets[0].id).toBe(assetId);
   });
@@ -147,7 +149,9 @@ describe("Balance-sheet entry", () => {
     fireEvent.change(within(asset).getByLabelText("Currency"), { target: { value: "USD" } });
     fireEvent.change(within(asset).getByLabelText("Source"), { target: { value: "Bank statement" } });
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save Snapshot" }));
+    const save = screen.getByRole("button", { name: "Save Snapshot" }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
     await waitFor(() => expect(api.captureSnapshot).toHaveBeenCalledOnce());
     const body = api.captureSnapshot.mock.calls[0][0].body;
     expect(body).toMatchObject({ baseCurrency: "TWD", assets: [{ originalMoney: { amount: "100.00", currency: "USD" } }], liabilities: [] });
@@ -160,8 +164,18 @@ describe("Balance-sheet entry", () => {
     api.getSnapshot.mockResolvedValue({ data: { id: "snapshot-1", asOf: "2026-07-31T00:00:00Z", baseCurrency: "TWD", assets: [{ id: assetId, name: "USD cash", type: "CASH", liquidity: "LIQUID", money: { amount: "3210", currency: "TWD" }, appliedConversion: { originalMoney: { amount: "100", currency: "USD" }, rate: "32.1", rateDate: "2026-07-31", provider: "CBC" }, effectiveAt: "2026-07-30T00:00:00Z", source: "Bank" }], liabilities: [] } });
     render(<EntryPage />); await selectManualEntry();
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
-    expect(await screen.findByText("USD → TWD: 32.1 (CBC, Aug 1, 2026)")).toBeTruthy();
+    expect(await screen.findByText("Cash: 100 USD → 3,210 TWD (32.1; CBC; REFERENCE_RATE; Aug 1, 2026; HALF_EVEN)")).toBeTruthy();
     expect(api.getFxRates).toHaveBeenCalledWith({ query: { asOf: "2026-08-02", currencies: ["USD"] } });
+  });
+
+  it("blocks confirmation when an automatic currency has no eligible rate", async () => {
+    api.getFxRates.mockResolvedValue({ data: { valuationCurrency: "TWD", asOf: "2026-08-02", rates: [], missingCurrencies: ["USD"] } });
+    api.getSnapshot.mockResolvedValue({ data: { id: "snapshot-1", asOf: "2026-07-31T00:00:00Z", baseCurrency: "TWD", assets: [{ id: assetId, name: "Cash", type: "CASH", liquidity: "LIQUID", money: { amount: "3200", currency: "TWD" }, appliedConversion: { originalMoney: { amount: "100", currency: "USD" }, rate: "32", rateDate: "2026-07-31", provider: "CBC" }, effectiveAt: "2026-07-30T00:00:00Z", source: "Bank" }], liabilities: [] } });
+    render(<EntryPage />); await selectManualEntry();
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    expect(await screen.findByText("No official rate is available for: USD. Go back and add a declared rate to each affected position.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Save Snapshot" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(api.captureSnapshot).not.toHaveBeenCalled();
   });
 
   it("lets the user explicitly override an official rate with declared provenance", async () => {

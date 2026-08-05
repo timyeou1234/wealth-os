@@ -5,6 +5,7 @@ import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "re
 import { archiveAsset, archiveLiability, captureSnapshot, getFxRates, getSnapshot, listAssets, listLiabilities, listSnapshots } from "../api/client";
 import type { AssetFactResponse, AssetResponse, CaptureAssetRequest, CaptureLiabilityRequest, CaptureSnapshotRequest, FxRateItemResponse, LiabilityFactResponse, LiabilityResponse, SnapshotResponse, ValidationProblemResponse } from "../api/client";
 import { AppNavigation } from "../app-navigation";
+import { multiplyMoney } from "../decimal-money";
 import { currencyName, isSupportedCurrency, parseAgentImport, supportedCurrencies } from "./import";
 import type { AgentImport, AgentImportAsset, AgentImportLiability } from "./import";
 
@@ -54,7 +55,18 @@ const displayDate = (value: string) => new Intl.DateTimeFormat("en-US", { dateSt
 const assetTypes = ["CASH", "INVESTMENT", "REAL_ESTATE", "VEHICLE", "BUSINESS", "OTHER"] as const;
 const liquidities = ["LIQUID", "SEMI_LIQUID", "ILLIQUID"] as const;
 const decimal = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
-const positiveDecimal = /^(?:0\.\d*[1-9]\d*|[1-9]\d*(?:\.\d+)?)$/;
+const positiveDecimal = /^(?=.*[1-9])(?:0|[1-9]\d*)(?:\.\d{1,12})?$/;
+
+function fxPreviewText(item: { name: string; amount: string; currency: string; declaredRate?: DeclaredRateDraft }, reference?: FxRateItemResponse): string {
+  const rate = item.declaredRate?.rate ?? reference?.rate;
+  const rateDate = item.declaredRate?.rateDate ?? reference?.rateDate;
+  if (!rate || !rateDate || !decimal.test(item.amount) || !positiveDecimal.test(rate)) return `${item.name}: conversion unavailable`;
+  const twd = new Intl.NumberFormat("en-US").format(BigInt(multiplyMoney(item.amount, rate, "TWD")));
+  const provider = item.declaredRate ? "USER" : reference?.provider ?? "provider unavailable";
+  const rateType = item.declaredRate ? "USER_DECLARED" : reference?.rateType ?? "REFERENCE_RATE";
+  const basis = item.declaredRate ? `; ${item.declaredRate.basis}` : "";
+  return `${item.name}: ${item.amount} ${item.currency} → ${twd} TWD (${rate}; ${provider}; ${rateType}; ${displayDate(`${rateDate}T00:00:00Z`)}; HALF_EVEN${basis})`;
+}
 
 export default function EntryPage() {
   const router = useRouter();
@@ -119,6 +131,9 @@ export default function EntryPage() {
   const foreignCurrencies = [...new Set([...assets, ...liabilities].map((item) => item.currency).filter((currency) => currency && currency !== "TWD"))].sort();
   const automaticCurrencies = [...new Set([...assets, ...liabilities].filter((item) => !item.declaredRate).map((item) => item.currency).filter((currency) => currency && currency !== "TWD"))].sort();
   const foreignCurrencyKey = automaticCurrencies.join(",");
+  const rateByCurrency = new Map(fxRates.flatMap((rate) => rate.originalCurrency ? [[rate.originalCurrency, rate] as const] : []));
+  const unresolvedCurrencies = automaticCurrencies.filter((currency) => !rateByCurrency.has(currency));
+  const fxReady = unresolvedCurrencies.length === 0;
   useEffect(() => {
     if (mode !== "manual" || step !== "review" || !snapshotDate || !foreignCurrencyKey) {
       setFxRates([]);
@@ -130,7 +145,7 @@ export default function EntryPage() {
       .then((response) => {
         if (cancelled) return;
         setFxRates(response.data?.rates ?? []);
-        setMissingCurrencies(response.data?.missingCurrencies ?? []);
+        setMissingCurrencies(response.data?.missingCurrencies ?? foreignCurrencyKey.split(","));
       })
       .catch(() => {
         if (!cancelled) setMissingCurrencies(foreignCurrencyKey.split(","));
@@ -209,14 +224,18 @@ export default function EntryPage() {
     setMode("manual");
   };
 
-  const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, baseCurrency, assets, liabilities);
+  const prompt = buildPrompt(includeDraftInPrompt, snapshotDate, assets, liabilities);
   const settingsComplete = Boolean(snapshotDate);
-  const assetsComplete = validAssets(assets, snapshotDate, baseCurrency);
-  const liabilitiesComplete = validLiabilities(liabilities, snapshotDate, baseCurrency);
+  const assetsComplete = validAssets(assets, snapshotDate);
+  const liabilitiesComplete = validLiabilities(liabilities, snapshotDate);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(undefined);
+    if (!fxReady) {
+      setError("Every foreign-currency position needs an official or declared rate before saving.");
+      return;
+    }
     if (!settingsComplete || !assetsComplete || !liabilitiesComplete) {
       const invalidStep: EntryStep = !assetsComplete ? "assets" : "liabilities";
       setShowValidation(true);
@@ -303,7 +322,7 @@ export default function EntryPage() {
         {step === "assets" && <section className="entry-step-panel" aria-labelledby="assets-step-title">
           <div className="step-heading"><p className="eyebrow">Step 1 of 3</p><h2 id="assets-step-title" tabIndex={-1}>Assets</h2><p>Review every active asset and its value for this Snapshot.</p></div>
           <EntrySection title="Assets" apiField="assets" onAdd={addAsset} addLabel="Add asset">
-            {assets.map((asset, index) => <AssetFields key={asset.key} index={index} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} baseCurrency={baseCurrency} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
+            {assets.map((asset, index) => <AssetFields key={asset.key} index={index} draft={asset} isNew={!asset.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setAssets((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={asset.id ? () => setArchiveTarget({ kind: "asset", id: asset.id!, key: asset.key, name: asset.name }) : undefined} />)}
           </EntrySection>
           <StepActions next="liabilities" onChange={setStep} />
         </section>}
@@ -311,7 +330,7 @@ export default function EntryPage() {
         {step === "liabilities" && <section className="entry-step-panel" aria-labelledby="liabilities-step-title">
           <div className="step-heading"><p className="eyebrow">Step 2 of 3</p><h2 id="liabilities-step-title" tabIndex={-1}>Liabilities</h2><p>Review every active liability and its balance for this Snapshot.</p></div>
           <EntrySection title="Liabilities" apiField="liabilities" onAdd={addLiability} addLabel="Add liability">
-            {liabilities.map((liability, index) => <LiabilityFields key={liability.key} index={index} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} baseCurrency={baseCurrency} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
+            {liabilities.map((liability, index) => <LiabilityFields key={liability.key} index={index} draft={liability} isNew={!liability.id} snapshotDate={snapshotDate} showValidation={showValidation} onChange={(next) => setLiabilities((items) => items.map((item, itemIndex) => itemIndex === index ? next : item))} onArchive={liability.id ? () => setArchiveTarget({ kind: "liability", id: liability.id!, key: liability.key, name: liability.name }) : undefined} />)}
           </EntrySection>
           <StepActions previous="assets" next="review" onChange={setStep} />
         </section>}
@@ -327,12 +346,11 @@ export default function EntryPage() {
           {foreignCurrencies.length > 0 && <section className="fx-review" aria-labelledby="fx-review-title">
             <h3 id="fx-review-title">FX valuation</h3>
             <p>Official rates apply unless a position has an explicit declared-rate override.</p>
-            <ul>{fxRates.map((rate) => <li key={rate.originalCurrency}>{rate.originalCurrency} → TWD: {rate.rate} ({rate.provider}, {rate.rateDate ? displayDate(`${rate.rateDate}T00:00:00Z`) : "date unavailable"})</li>)}</ul>
-            <ul>{[...assets, ...liabilities].filter((item) => item.declaredRate).map((item) => <li key={item.key}>{item.name}: {item.currency} → TWD: {item.declaredRate!.rate || "rate missing"} (declared, {item.declaredRate!.rateDate ? displayDate(`${item.declaredRate!.rateDate}T00:00:00Z`) : "date missing"}; {item.declaredRate!.basis || "basis missing"})</li>)}</ul>
-            {missingCurrencies.length > 0 && <p className="review-warning">No official rate is available for: {missingCurrencies.join(", ")}.</p>}
+            <ul>{[...assets, ...liabilities].filter((item) => item.currency !== "TWD").map((item) => <li key={item.key}>{fxPreviewText(item, rateByCurrency.get(item.currency))}</li>)}</ul>
+            {missingCurrencies.length > 0 && <p className="review-warning">No official rate is available for: {missingCurrencies.join(", ")}. Go back and add a declared rate to each affected position.</p>}
           </section>}
           {(!settingsComplete || !assetsComplete || !liabilitiesComplete) && <p className="review-warning">Some steps still contain missing or invalid values. Saving will take you to the first field to fix.</p>}
-          <div className="step-actions"><button type="button" onClick={() => setStep("liabilities")}>Back</button><button className="primary-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Snapshot"}</button></div>
+          <div className="step-actions"><button type="button" onClick={() => setStep("liabilities")}>Back</button><button className="primary-action" type="submit" disabled={saving || !fxReady}>{saving ? "Saving…" : "Save Snapshot"}</button></div>
         </section>}
         </div>}
 
@@ -501,7 +519,7 @@ function ModalDialog({ label, onDismiss, children }: { label: string; onDismiss:
 
 const focusableSelector = "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])";
 
-function AssetFields({ index, draft, isNew, snapshotDate, baseCurrency, showValidation, onChange, onArchive }: { index: number; draft: AssetDraft; isNew: boolean; snapshotDate: string; baseCurrency: string; showValidation: boolean; onChange: (draft: AssetDraft) => void; onArchive?: () => void }) {
+function AssetFields({ index, draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { index: number; draft: AssetDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: AssetDraft) => void; onArchive?: () => void }) {
   const label = isNew ? "New asset" : draft.name;
   const invalidName = showValidation && !draft.name.trim();
   const invalidType = showValidation && !draft.type;
@@ -524,7 +542,7 @@ function AssetFields({ index, draft, isNew, snapshotDate, baseCurrency, showVali
   </fieldset>;
 }
 
-function LiabilityFields({ index, draft, isNew, snapshotDate, baseCurrency, showValidation, onChange, onArchive }: { index: number; draft: LiabilityDraft; isNew: boolean; snapshotDate: string; baseCurrency: string; showValidation: boolean; onChange: (draft: LiabilityDraft) => void; onArchive?: () => void }) {
+function LiabilityFields({ index, draft, isNew, snapshotDate, showValidation, onChange, onArchive }: { index: number; draft: LiabilityDraft; isNew: boolean; snapshotDate: string; showValidation: boolean; onChange: (draft: LiabilityDraft) => void; onArchive?: () => void }) {
   const label = isNew ? "New liability" : draft.name;
   const invalidName = showValidation && !draft.name.trim();
   const invalidAmount = showValidation && !decimal.test(draft.amount);
@@ -590,16 +608,12 @@ function validDeclaredRate(value: DeclaredRateDraft | undefined, snapshotDate: s
   return !value || Boolean(positiveDecimal.test(value.rate) && value.rateDate && value.rateDate <= snapshotDate && value.basis.trim());
 }
 
-function validAssets(assets: AssetDraft[], snapshotDate: string, baseCurrency: string): boolean {
+function validAssets(assets: AssetDraft[], snapshotDate: string): boolean {
   return assets.every((item) => Boolean(item.name.trim() && item.type && item.liquidity && decimal.test(item.amount) && isSupportedCurrency(item.currency) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim() && validDeclaredRate(item.declaredRate, snapshotDate)));
 }
 
-function validLiabilities(liabilities: LiabilityDraft[], snapshotDate: string, baseCurrency: string): boolean {
+function validLiabilities(liabilities: LiabilityDraft[], snapshotDate: string): boolean {
   return liabilities.every((item) => Boolean(item.name.trim() && decimal.test(item.amount) && isSupportedCurrency(item.currency) && item.effectiveDate && item.effectiveDate <= snapshotDate && item.source.trim() && validDeclaredRate(item.declaredRate, snapshotDate)));
-}
-
-function hasMonetaryFacts(assets: AssetDraft[], liabilities: LiabilityDraft[]): boolean {
-  return assets.some((item) => item.amount.trim()) || liabilities.some((item) => item.amount.trim());
 }
 
 function describeAssetUpdate(current: AssetDraft, imported: AgentImportAsset): string[] {
@@ -694,7 +708,7 @@ function mergeLiabilities(current: LiabilityDraft[], imported: AgentImport, next
   return [...updated, ...additions];
 }
 
-function buildPrompt(includeDraft: boolean, snapshotDate: string, baseCurrency: string, assets: AssetDraft[], liabilities: LiabilityDraft[]): string {
+function buildPrompt(includeDraft: boolean, snapshotDate: string, assets: AssetDraft[], liabilities: LiabilityDraft[]): string {
   const contextReady = Boolean(snapshotDate);
   const shape = {
     schemaVersion: 2,
