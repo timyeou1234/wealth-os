@@ -49,10 +49,13 @@ class ApiSecurityConfiguration(
 
     private fun isHumanAccessToken(authentication: Authentication): Boolean {
         val subject = (authentication as? JwtAuthenticationToken)?.token?.subject ?: return false
-        return !subject.endsWith(AUTH0_MACHINE_SUBJECT_SUFFIX) && currentUserResolver.resolve(authentication) != null
+        return !subject.endsWith(AUTH0_MACHINE_SUBJECT_SUFFIX) &&
+            authentication.authorities.any { it.authority == WEALTH_ACCESS_AUTHORITY } &&
+            currentUserResolver.resolve(authentication) != null
     }
 
     companion object {
+        private const val WEALTH_ACCESS_AUTHORITY = "SCOPE_wealth:access"
         private const val FX_SYNC_AUTHORITY = "SCOPE_fx:sync"
         private const val AUTH0_MACHINE_SUBJECT_SUFFIX = "@clients"
     }

@@ -4,7 +4,7 @@ import { redisSessionStore } from "./redis-session-store";
 export const auth0 = new Auth0Client({
   authorizationParameters: {
     audience: process.env.AUTH0_AUDIENCE,
-    scope: "openid profile email offline_access",
+    scope: "openid profile email offline_access wealth:access",
   },
   enableAccessTokenEndpoint: false,
   session: {

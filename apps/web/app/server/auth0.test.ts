@@ -11,6 +11,10 @@ await import("./auth0");
 describe("Auth0 server client", () => {
   it("uses only server-side sessions with the accepted timeout policy", async () => {
     expect(auth0Client).toHaveBeenCalledWith(expect.objectContaining({
+      authorizationParameters: {
+        audience: process.env.AUTH0_AUDIENCE,
+        scope: "openid profile email offline_access wealth:access",
+      },
       enableAccessTokenEndpoint: false,
       sessionStore,
       session: expect.objectContaining({
