@@ -13,7 +13,12 @@ import org.springframework.context.annotation.Import
 import kotlin.test.assertEquals
 import java.util.UUID
 
-@DataJpaTest(properties = ["spring.jpa.hibernate.ddl-auto=create-drop"])
+@DataJpaTest(
+    properties = [
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.flyway.enabled=false",
+    ],
+)
 @Import(JpaAssetRepository::class)
 class JpaAssetRepositoryTest
     @Autowired

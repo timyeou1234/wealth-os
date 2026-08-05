@@ -28,7 +28,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
-@DataJpaTest(properties = ["spring.jpa.hibernate.ddl-auto=create-drop"])
+@DataJpaTest(
+    properties = [
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.flyway.enabled=false",
+    ],
+)
 @Import(JpaSnapshotRepository::class)
 class JpaSnapshotRepositoryTest
     @Autowired
