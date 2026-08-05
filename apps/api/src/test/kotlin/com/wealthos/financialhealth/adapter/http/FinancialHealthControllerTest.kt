@@ -33,7 +33,7 @@ import java.time.Instant
         "spring.jpa.hibernate.ddl-auto=create-drop",
     ],
 )
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @Transactional
 class FinancialHealthControllerTest {
     @Autowired

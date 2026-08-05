@@ -77,7 +77,7 @@ See the [architecture overview](docs/architecture/overview.md) and
 | Data | PostgreSQL |
 | Contract | REST, springdoc-openapi, Swagger UI |
 | Infrastructure | Docker, Docker Compose |
-| Authentication | Deliberately undecided pending threat modeling |
+| Authentication | Auth0 OIDC, mandatory Next.js BFF, Redis server-side sessions |
 
 ## Roadmap
 

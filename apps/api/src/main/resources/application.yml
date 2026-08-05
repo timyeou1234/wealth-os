@@ -1,4 +1,10 @@
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${WEALTHOS_AUTH_ISSUER_URI}
+          audiences: ${WEALTHOS_AUTH_AUDIENCE}
   datasource:
     url: ${WEALTHOS_DATABASE_URL:jdbc:postgresql://localhost:5432/wealthos}
     username: ${WEALTHOS_DATABASE_USERNAME:wealthos}

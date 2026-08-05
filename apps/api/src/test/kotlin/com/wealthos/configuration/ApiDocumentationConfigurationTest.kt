@@ -33,6 +33,20 @@ class ApiDocumentationConfigurationTest {
     }
 
     @Test
+    fun `documents separate user and operational authentication boundaries`() {
+        mockMvc.get("/v3/api-docs")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.components.securitySchemes.userBearer.type") { value("http") }
+                jsonPath("$.components.securitySchemes.userBearer.scheme") { value("bearer") }
+                jsonPath("$.components.securitySchemes.operationalM2mBearer.type") { value("http") }
+                jsonPath("$.components.securitySchemes.operationalM2mBearer.scheme") { value("bearer") }
+                jsonPath("$.security[0].userBearer") { exists() }
+                jsonPath("$.paths['/api/v1/fx-rates/sync'].post.security[0].operationalM2mBearer") { exists() }
+            }
+    }
+
+    @Test
     fun `documents asset creation success and validation responses`() {
         mockMvc.get("/v3/api-docs")
             .andExpect {

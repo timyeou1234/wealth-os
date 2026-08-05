@@ -26,7 +26,7 @@ import java.time.LocalDate
         "spring.jpa.hibernate.ddl-auto=create-drop",
     ],
 )
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class SnapshotCaptureControllerTest {
     @Autowired

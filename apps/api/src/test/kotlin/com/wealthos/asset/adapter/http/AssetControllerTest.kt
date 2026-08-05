@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional
         "spring.jpa.hibernate.ddl-auto=create-drop",
     ],
 )
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @Transactional
 class AssetControllerTest {
     @Autowired

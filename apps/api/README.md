@@ -17,13 +17,23 @@ Run from the repository root:
 ```bash
 ./gradlew :apps:api:test
 ./gradlew :apps:api:build
+WEALTHOS_AUTH_ISSUER_URI=https://YOUR_AUTH0_DOMAIN/ \
+WEALTHOS_AUTH_AUDIENCE=https://YOUR_WEALTH_OS_API_AUDIENCE \
 ./gradlew :apps:api:bootRun
 ```
+
+The API fails to start without an explicit OAuth issuer and audience. Personal endpoints
+require an Auth0 user access token. `POST /api/v1/fx-rates/sync` instead requires the
+separate `fx:sync` machine authority. Never commit real tenant identifiers, tokens, client
+secrets, or allowlist values.
 
 With the application running, its generated API documentation is available at:
 
 - Swagger UI: <http://localhost:8080/swagger-ui.html>
 - OpenAPI JSON: <http://localhost:8080/v3/api-docs>
+
+Documentation remains reachable for local development, but trying an authenticated
+operation requires the appropriate development Bearer token.
 
 The HTTP conventions that future feature endpoints must follow are documented in
 [`docs/architecture/api-contract.md`](../../docs/architecture/api-contract.md).
