@@ -48,6 +48,14 @@ export function divideMoney(amount: string, rate: string, currency: string): str
   return scaledDecimal(sign * roundHalfEven(numerator, denominator), scale);
 }
 
+export function multiplyMoney(amount: string, rate: string, currency: string): string {
+  const left = parseDecimal(amount);
+  const right = parseDecimal(rate);
+  const product = { coefficient: left.coefficient * right.coefficient, scale: left.scale + right.scale };
+  const scale = currencyScale(currency);
+  return scaledDecimal(rescale(product, scale), scale);
+}
+
 export function formatMoney(amount: string, currency: string): string {
   const scale = currencyScale(currency);
   const coefficient = rescale(parseDecimal(amount), scale);
