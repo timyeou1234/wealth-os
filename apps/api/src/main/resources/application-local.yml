@@ -1,0 +1,5 @@
+springdoc:
+  api-docs:
+    enabled: ${WEALTHOS_SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${WEALTHOS_SWAGGER_ENABLED:false}

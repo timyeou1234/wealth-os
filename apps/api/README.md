@@ -22,6 +22,7 @@ WEALTHOS_AUTH_AUDIENCE=https://YOUR_WEALTH_OS_API_AUDIENCE \
 WEALTHOS_ALLOWED_EMAILS=YOUR_VERIFIED_EMAIL \
 WEALTHOS_FX_SYNC_CLIENT_ID=YOUR_DEVELOPMENT_M2M_CLIENT_ID \
 WEALTHOS_SWAGGER_ENABLED=true \
+SPRING_PROFILES_ACTIVE=local \
 ./gradlew :apps:api:bootRun
 ```
 
@@ -41,9 +42,17 @@ With the application running, its generated API documentation is available at:
 Documentation remains reachable for local development, but trying an authenticated
 operation requires the appropriate development Bearer token.
 
-Migrations V10-V12 intentionally clear unowned development Assets, Liabilities, and
-Snapshots before adding mandatory owner keys. Re-import development data only after the
-allowlisted identity has been provisioned; there is no legacy owner backfill.
+Migrations V10-V12 refuse to add mandatory owner keys while legacy financial rows exist;
+they never delete data automatically. For the accepted development-only reset, explicitly
+run the reset script before starting the upgraded API:
+
+```bash
+docker exec -i wealthos-postgres psql -U wealthos -d wealthos \
+  < apps/api/src/main/resources/db/dev/reset_unowned_financial_data.sql
+```
+
+Re-import development data only after the allowlisted identity has been provisioned;
+there is no legacy owner backfill. Never run the reset script against production.
 
 The HTTP conventions that future feature endpoints must follow are documented in
 [`docs/architecture/api-contract.md`](../../docs/architecture/api-contract.md).

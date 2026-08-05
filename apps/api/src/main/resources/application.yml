@@ -22,9 +22,9 @@ spring:
 
 springdoc:
   api-docs:
-    enabled: ${WEALTHOS_SWAGGER_ENABLED:false}
+    enabled: false
   swagger-ui:
-    enabled: ${WEALTHOS_SWAGGER_ENABLED:false}
+    enabled: false
 
 wealthos:
   auth:
