@@ -91,3 +91,29 @@ Repository entrypoints exist for tools that automatically discover `AGENTS.md`,
 - Use generated API clients rather than manually duplicating contracts.
 - Never commit credentials or real personal financial data.
 - Treat logs, fixtures, screenshots, exports, and backups as potential sensitive data.
+
+## Local quality gates
+
+Before pushing, run the same checks that protect pull requests:
+
+```bash
+./gradlew :apps:api:check :apps:api:build --no-daemon
+pnpm --dir apps/web install --frozen-lockfile
+pnpm --dir apps/web test
+pnpm --dir apps/web typecheck
+pnpm --dir apps/web build
+gitleaks git --redact --no-banner .
+trivy fs --include-dev-deps --scanners vuln,misconfig --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 .
+trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 redis:7.4-alpine
+```
+
+The API check includes ktlint, detekt, tests, and a JaCoCo HTML/XML report under
+`apps/api/build/reports/jacoco/test/`. Existing ktlint and detekt findings are captured
+in reviewed baselines; new findings fail the build. Reduce the baselines when resolving
+existing debt and never regenerate them merely to make a check pass. CI retains the
+coverage report for seven days. Install Gitleaks locally to run its command; CI always
+scans the complete Git history. Install Trivy to run the dependency,
+configuration, and container-image commands.
+
+Repository administrators should require the `API`, `Web`, and `Security` checks before
+merging to `main`.
