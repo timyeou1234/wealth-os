@@ -9,22 +9,21 @@ explainable financial calculations, and independent frontend/backend delivery.
 ## System shape
 
 ```text
-┌──────────────────────────┐       HTTPS / JSON       ┌──────────────────────────┐
-│ Web application          │ ───────────────────────▶ │ API application          │
-│ Next.js + React          │ ◀─────────────────────── │ Kotlin + Spring Boot     │
-│ Generated API client     │       OpenAPI contract   │ Modular monolith         │
-└──────────────────────────┘                           └────────────┬─────────────┘
-                                                                  │
-                                                                  ▼
-                                                     ┌──────────────────────────┐
-                                                     │ PostgreSQL               │
-                                                     │ Transactional source     │
-                                                     │ of truth                  │
-                                                     └──────────────────────────┘
+Google ──▶ Auth0 ──▶ Next.js BFF ──Bearer JWT──▶ private Spring Boot API
+                         │                              │
+                         ▼                              ▼
+                 Redis session store             PostgreSQL
+                 (opaque cookie key)       (users and financial truth)
+
+Operational client ──M2M JWT with fx:sync─────────────▶│
 ```
 
 The applications share a repository and delivery conventions, not a deployment unit.
 Each must remain independently buildable, testable, versionable, and deployable.
+The browser reaches product APIs only through same-origin Next.js BFF routes. The BFF
+stores Auth0 sessions in Redis and gives the browser only an opaque HttpOnly session key.
+The Spring API remains independently secured as an OAuth resource server and does not
+trust the BFF as an identity assertion.
 
 ## Backend boundaries
 
@@ -87,15 +86,27 @@ lands, the existing manual-conversion capture contract remains active. In the ta
 
 ## Security posture
 
-Authentication remains undecided until usage, deployment, and threat models are
-documented. Before production data is introduced, the project must define:
+Issue #13 establishes the first deployable identity boundary. Auth0 brokers Google OIDC
+login for explicitly allowlisted identities. Next.js is a mandatory backend-for-frontend,
+uses a Redis-backed server-side session, and never exposes access or refresh tokens to
+browser JavaScript. Spring validates access-token signature, issuer, audience, expiry, and
+authority independently, then maps issuer plus subject to a local User.
 
-- Identity, session, and account-recovery design
-- Authorization boundaries and secure defaults
-- Encryption and secret management
-- Audit events and sensitive logging controls
-- Backup, restore, retention, export, and deletion behavior
-- Dependency and container supply-chain controls
+Every financial application operation derives its owner from the authenticated Spring
+Security context. Request paths, query parameters, and bodies never select an owner.
+Cross-owner identifiers behave as not found. Official CBC FX rates remain shared
+reference data; manual operational synchronization requires a separate machine identity
+with `fx:sync` rather than a privileged front-end user.
+
+Production exposes Next.js publicly and keeps Spring, Redis, PostgreSQL, and Swagger on
+private networks. Development and production use separate Auth0 applications, audiences,
+callback URLs, M2M clients, Redis namespaces, and secrets. See
+[Authentication and Authorization](authentication-and-authorization.md) and
+[ADR-009](../adr/0009-authenticated-bff-and-owner-isolation.md).
+
+Authentication does not complete the production security posture. Backup and restore,
+retention and deletion, audit events, sensitive observability, dependency controls, and
+secret rotation remain explicit follow-up work before broader production use.
 
 ## Deferred decisions
 
@@ -104,7 +115,6 @@ Before persistence begins, the project must resolve or record:
 - Persistence enforcement for linear snapshot-correction chains and latest-revision
   selection
 - Database ownership and schema conventions
-- Authentication and deployment threat model
 - Observability and audit requirements
 
 Account and Holding aggregates, security instruments, and market-price data remain

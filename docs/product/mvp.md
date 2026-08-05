@@ -21,20 +21,20 @@ The first release should allow a financially engaged individual to answer:
 
 ## Primary user journey
 
-Issue #66 changes this journey incrementally. FX-rate synchronization and auditable
-Snapshot conversion are implemented first; Input and Dashboard presentation follow in a
-later vertical slice.
+Issue #66 changes the financial-data journey incrementally. Issue #13 adds the mandatory
+private-access boundary before the product is deployed with real financial data.
 
-1. The user records material assets and liabilities in their original currencies.
-2. Wealth OS converts supported foreign-currency facts into canonical TWD valuations
+1. An explicitly allowlisted user signs in with Google.
+2. The user records material assets and liabilities in their original currencies.
+3. Wealth OS converts supported foreign-currency facts into canonical TWD valuations
    using an inspectable historical reference rate.
-3. The user reviews the original facts, conversion evidence, and TWD valuations.
-4. The system calculates total assets, total liabilities, and net worth.
-5. The system derives debt ratio and immediately liquid asset share from the same balance
+4. The user reviews the original facts, conversion evidence, and TWD valuations.
+5. The system calculates total assets, total liabilities, and net worth.
+6. The system derives debt ratio and immediately liquid asset share from the same balance
    sheet.
-6. The user can inspect the assets and liabilities behind every displayed metric.
-7. The user saves a reproducible snapshot.
-8. The user compares it with the previous snapshot and inspects total and item-level
+7. The user can inspect the assets and liabilities behind every displayed metric.
+8. The user saves a reproducible snapshot owned by their local Wealth OS identity.
+9. The user compares it with their previous snapshot and inspects total and item-level
    changes.
 
 ## In scope
@@ -61,6 +61,18 @@ later vertical slice.
   and base currency, and imported JSON must match that context exactly. Wealth OS
   validates the JSON locally, but never sends financial data to an AI service or applies
   imported changes without user review.
+
+### Private access
+
+- Allow only configured, verified Google identities to sign in through Auth0.
+- Resolve the authenticated session to a local Wealth OS User without accepting a
+  client-supplied owner identifier.
+- Isolate every Asset, Liability, Snapshot, comparison, and derived financial view by
+  that session-derived User.
+- Route every browser product request through the Next.js backend-for-frontend. Browser
+  JavaScript never receives an access or refresh token.
+- Keep human product sessions separate from machine administration. A front-end user
+  cannot obtain operational authority.
 
 ### Financial position
 
@@ -108,6 +120,7 @@ own positions or calculations in the first model.
 
 The MVP requires only data that belongs to the personal balance sheet:
 
+- Authenticated owner identity
 - Assets
 - Liabilities
 - Valuations
@@ -122,6 +135,8 @@ The MVP does not require income, spending, budgets, goals, or forecasts.
 
 The MVP definition is satisfied when:
 
+- An unauthenticated or non-allowlisted caller cannot access personal financial data.
+- An authenticated user cannot discover or access another user's resources.
 - A user can enter a representative set of assets and liabilities manually.
 - Every value has a currency, effective date, and identifiable source.
 - Total assets, total liabilities, and net worth are reproducible from the stored data.
