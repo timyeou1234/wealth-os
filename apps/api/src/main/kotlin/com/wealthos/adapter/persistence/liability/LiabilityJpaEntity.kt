@@ -11,6 +11,8 @@ import java.util.UUID
 class LiabilityJpaEntity(
     @Id
     val id: UUID,
+    @Column(name = "owner_id", nullable = false)
+    val ownerId: UUID,
     @Column(nullable = false)
     val name: String,
     @Column(nullable = false)

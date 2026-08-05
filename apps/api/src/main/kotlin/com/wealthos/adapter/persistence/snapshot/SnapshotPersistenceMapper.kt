@@ -20,11 +20,16 @@ import com.wealthos.domain.snapshot.SnapshotAssetPosition
 import com.wealthos.domain.snapshot.SnapshotCorrection
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotLiabilityPosition
+import com.wealthos.identity.domain.UserId
 
 internal object SnapshotPersistenceMapper {
-    fun snapshotEntity(snapshot: Snapshot): SnapshotJpaEntity =
+    fun snapshotEntity(
+        ownerId: UserId,
+        snapshot: Snapshot,
+    ): SnapshotJpaEntity =
         SnapshotJpaEntity(
             id = snapshot.id.value,
+            ownerId = ownerId.value,
             asOf = snapshot.asOf,
             recordedAt = snapshot.recordedAt,
             baseCurrency = snapshot.baseCurrency?.code,

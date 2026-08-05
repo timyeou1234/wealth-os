@@ -1,18 +1,29 @@
 package com.wealthos.domain.snapshot
 
+import com.wealthos.identity.domain.UserId
 import java.time.Instant
 
 interface SnapshotRepository {
-    fun save(snapshot: Snapshot): Snapshot
+    fun save(
+        ownerId: UserId,
+        snapshot: Snapshot,
+    ): Snapshot
 
-    fun findById(id: SnapshotId): Snapshot?
+    fun findById(
+        ownerId: UserId,
+        id: SnapshotId,
+    ): Snapshot?
 
-    fun findEffectiveById(id: SnapshotId): Snapshot?
+    fun findEffectiveById(
+        ownerId: UserId,
+        id: SnapshotId,
+    ): Snapshot?
 
     fun findEffectiveBetween(
+        ownerId: UserId,
         fromInclusive: Instant,
         toExclusive: Instant,
     ): List<Snapshot>
 
-    fun findAllEffective(): List<Snapshot>
+    fun findAllEffective(ownerId: UserId): List<Snapshot>
 }

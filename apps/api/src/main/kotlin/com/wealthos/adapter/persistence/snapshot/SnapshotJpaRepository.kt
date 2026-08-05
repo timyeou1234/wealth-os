@@ -5,12 +5,21 @@ import java.time.Instant
 import java.util.UUID
 
 interface SnapshotJpaRepository : JpaRepository<SnapshotJpaEntity, UUID> {
-    fun findBySupersedesId(supersedesId: UUID): SnapshotJpaEntity?
+    fun findByIdAndOwnerId(
+        id: UUID,
+        ownerId: UUID,
+    ): SnapshotJpaEntity?
 
-    fun findAllBySupersedesIdIsNullAndAsOfGreaterThanEqualAndAsOfLessThanOrderByAsOfAsc(
+    fun findBySupersedesIdAndOwnerId(
+        supersedesId: UUID,
+        ownerId: UUID,
+    ): SnapshotJpaEntity?
+
+    fun findAllByOwnerIdAndSupersedesIdIsNullAndAsOfGreaterThanEqualAndAsOfLessThanOrderByAsOfAsc(
+        ownerId: UUID,
         fromInclusive: Instant,
         toExclusive: Instant,
     ): List<SnapshotJpaEntity>
 
-    fun findAllBySupersedesIdIsNullOrderByAsOfAsc(): List<SnapshotJpaEntity>
+    fun findAllByOwnerIdAndSupersedesIdIsNullOrderByAsOfAsc(ownerId: UUID): List<SnapshotJpaEntity>
 }

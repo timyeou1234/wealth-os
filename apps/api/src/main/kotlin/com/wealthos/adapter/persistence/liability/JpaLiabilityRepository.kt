@@ -3,21 +3,30 @@ package com.wealthos.adapter.persistence.liability
 import com.wealthos.domain.liability.Liability
 import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.liability.LiabilityRepository
+import com.wealthos.identity.domain.UserId
 import org.springframework.stereotype.Repository
 
 @Repository
 class JpaLiabilityRepository(
     private val repository: LiabilityJpaRepository,
 ) : LiabilityRepository {
-    override fun save(liability: Liability): Liability = repository.save(liability.toEntity()).toDomain()
+    override fun save(
+        ownerId: UserId,
+        liability: Liability,
+    ): Liability = repository.save(liability.toEntity(ownerId)).toDomain()
 
-    override fun findById(id: LiabilityId): Liability? = repository.findById(id.value).orElse(null)?.toDomain()
+    override fun findById(
+        ownerId: UserId,
+        id: LiabilityId,
+    ): Liability? = repository.findByIdAndOwnerId(id.value, ownerId.value)?.toDomain()
 
-    override fun findAll(): List<Liability> = repository.findAll().map { it.toDomain() }
+    override fun findAll(ownerId: UserId): List<Liability> =
+        repository.findAllByOwnerId(ownerId.value).map { it.toDomain() }
 
-    private fun Liability.toEntity(): LiabilityJpaEntity =
+    private fun Liability.toEntity(ownerId: UserId): LiabilityJpaEntity =
         LiabilityJpaEntity(
             id = id.value,
+            ownerId = ownerId.value,
             name = name,
             archived = archived,
         )

@@ -12,6 +12,8 @@ import java.util.UUID
 class SnapshotJpaEntity(
     @Id
     val id: UUID,
+    @Column(name = "owner_id", nullable = false)
+    val ownerId: UUID,
     @Column(name = "as_of", nullable = false)
     val asOf: Instant,
     @Column(name = "recorded_at", nullable = false)

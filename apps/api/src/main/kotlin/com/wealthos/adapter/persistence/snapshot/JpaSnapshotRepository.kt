@@ -3,6 +3,7 @@ package com.wealthos.adapter.persistence.snapshot
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotRepository
+import com.wealthos.identity.domain.UserId
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -15,15 +16,18 @@ class JpaSnapshotRepository(
     private val liabilityPositions: SnapshotLiabilityPositionJpaRepository,
 ) : SnapshotRepository {
     @Transactional
-    override fun save(snapshot: Snapshot): Snapshot {
+    override fun save(
+        ownerId: UserId,
+        snapshot: Snapshot,
+    ): Snapshot {
         require(!snapshots.existsById(snapshot.id.value)) {
             "Snapshot identity already exists: ${snapshot.id}"
         }
         snapshot.supersedes?.let { predecessorId ->
             val predecessor =
-                snapshots.findById(predecessorId.value).orElse(null)
+                snapshots.findByIdAndOwnerId(predecessorId.value, ownerId.value)
                     ?: throw IllegalArgumentException("Superseded Snapshot does not exist: $predecessorId")
-            require(snapshots.findBySupersedesId(predecessorId.value) == null) {
+            require(snapshots.findBySupersedesIdAndOwnerId(predecessorId.value, ownerId.value) == null) {
                 "Snapshot is not the terminal correction: $predecessorId"
             }
             require(snapshot.asOf == predecessor.asOf) {
@@ -34,22 +38,27 @@ class JpaSnapshotRepository(
             }
         }
 
-        snapshots.saveAndFlush(SnapshotPersistenceMapper.snapshotEntity(snapshot))
+        snapshots.saveAndFlush(SnapshotPersistenceMapper.snapshotEntity(ownerId, snapshot))
         assetPositions.saveAll(SnapshotPersistenceMapper.assetEntities(snapshot))
         liabilityPositions.saveAll(SnapshotPersistenceMapper.liabilityEntities(snapshot))
         return snapshot
     }
 
     @Transactional(readOnly = true)
-    override fun findById(id: SnapshotId): Snapshot? =
-        snapshots.findById(id.value).orElse(null)?.let(::load)
+    override fun findById(
+        ownerId: UserId,
+        id: SnapshotId,
+    ): Snapshot? = snapshots.findByIdAndOwnerId(id.value, ownerId.value)?.let(::load)
 
     @Transactional(readOnly = true)
-    override fun findEffectiveById(id: SnapshotId): Snapshot? =
-        snapshots.findById(id.value).orElse(null)?.let { load(findTerminal(it)) }
+    override fun findEffectiveById(
+        ownerId: UserId,
+        id: SnapshotId,
+    ): Snapshot? = snapshots.findByIdAndOwnerId(id.value, ownerId.value)?.let { load(findTerminal(ownerId, it)) }
 
     @Transactional(readOnly = true)
     override fun findEffectiveBetween(
+        ownerId: UserId,
         fromInclusive: Instant,
         toExclusive: Instant,
     ): List<Snapshot> {
@@ -57,23 +66,28 @@ class JpaSnapshotRepository(
             "Snapshot history start must be before its end"
         }
         return snapshots
-            .findAllBySupersedesIdIsNullAndAsOfGreaterThanEqualAndAsOfLessThanOrderByAsOfAsc(
+            .findAllByOwnerIdAndSupersedesIdIsNullAndAsOfGreaterThanEqualAndAsOfLessThanOrderByAsOfAsc(
+                ownerId.value,
                 fromInclusive,
                 toExclusive,
-            ).map { load(findTerminal(it)) }
+            ).map { load(findTerminal(ownerId, it)) }
     }
 
     @Transactional(readOnly = true)
-    override fun findAllEffective(): List<Snapshot> =
-        snapshots.findAllBySupersedesIdIsNullOrderByAsOfAsc().map { load(findTerminal(it)) }
+    override fun findAllEffective(ownerId: UserId): List<Snapshot> =
+        snapshots.findAllByOwnerIdAndSupersedesIdIsNullOrderByAsOfAsc(ownerId.value)
+            .map { load(findTerminal(ownerId, it)) }
 
-    private fun findTerminal(start: SnapshotJpaEntity): SnapshotJpaEntity {
+    private fun findTerminal(
+        ownerId: UserId,
+        start: SnapshotJpaEntity,
+    ): SnapshotJpaEntity {
         var current = start
         val visited = mutableSetOf<UUID>()
 
         while (true) {
             check(visited.add(current.id)) { "Snapshot correction chain contains a cycle" }
-            current = snapshots.findBySupersedesId(current.id) ?: return current
+            current = snapshots.findBySupersedesIdAndOwnerId(current.id, ownerId.value) ?: return current
         }
     }
 

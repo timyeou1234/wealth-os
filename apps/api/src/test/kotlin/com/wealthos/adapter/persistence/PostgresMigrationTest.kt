@@ -37,7 +37,8 @@ class PostgresMigrationTest
                           'snapshots',
                           'fx_rates',
                           'snapshot_asset_positions',
-                          'snapshot_liability_positions'
+                          'snapshot_liability_positions',
+                          'users'
                       )
                     order by table_name
                     """.trimIndent(),
@@ -52,13 +53,16 @@ class PostgresMigrationTest
                     "snapshot_asset_positions",
                     "snapshot_liability_positions",
                     "snapshots",
+                    "users",
                 ),
                 tables,
             )
+            val ownerId = insertUser()
             assertFailsWith<DataIntegrityViolationException> {
                 jdbc.update(
-                    "insert into assets (id, name, asset_type, liquidity) values (?, ?, ?, ?)",
+                    "insert into assets (id, owner_id, name, asset_type, liquidity) values (?, ?, ?, ?, ?)",
                     UUID.randomUUID(),
+                    ownerId,
                     " ",
                     "CASH",
                     "LIQUID",
@@ -71,9 +75,11 @@ class PostgresMigrationTest
             val originalId = UUID.randomUUID()
             val correctionId = UUID.randomUUID()
             val asOf = Instant.parse("2026-01-31T00:00:00Z")
+            val ownerId = insertUser()
 
-            insertSnapshot(originalId, asOf, asOf)
+            insertSnapshot(ownerId, originalId, asOf, asOf)
             insertSnapshot(
+                ownerId = ownerId,
                 id = correctionId,
                 asOf = asOf,
                 recordedAt = asOf.plusSeconds(60),
@@ -83,6 +89,7 @@ class PostgresMigrationTest
 
             assertFailsWith<DataIntegrityViolationException> {
                 insertSnapshot(
+                    ownerId = ownerId,
                     id = UUID.randomUUID(),
                     asOf = asOf,
                     recordedAt = asOf.plusSeconds(120),
@@ -92,6 +99,7 @@ class PostgresMigrationTest
             }
             assertFailsWith<DataIntegrityViolationException> {
                 insertSnapshot(
+                    ownerId = ownerId,
                     id = UUID.randomUUID(),
                     asOf = asOf,
                     recordedAt = asOf,
@@ -157,6 +165,7 @@ class PostgresMigrationTest
         }
 
         private fun insertSnapshot(
+            ownerId: UUID,
             id: UUID,
             asOf: Instant,
             recordedAt: Instant,
@@ -167,18 +176,32 @@ class PostgresMigrationTest
                 """
                 insert into snapshots (
                     id,
+                    owner_id,
                     as_of,
                     recorded_at,
                     supersedes_id,
                     correction_reason
-                ) values (?, ?, ?, ?, ?)
+                ) values (?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 id,
+                ownerId,
                 asOf.atOffset(ZoneOffset.UTC),
                 recordedAt.atOffset(ZoneOffset.UTC),
                 supersedesId,
                 correctionReason,
             )
+        }
+
+        private fun insertUser(): UUID {
+            val id = UUID.randomUUID()
+            jdbc.update(
+                "insert into users (id, issuer, subject, email) values (?, ?, ?, ?)",
+                id,
+                "https://migration-test.example/",
+                UUID.randomUUID().toString(),
+                "migration-test@example.com",
+            )
+            return id
         }
 
         companion object {

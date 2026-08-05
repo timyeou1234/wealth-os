@@ -15,15 +15,21 @@ import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
 import com.wealthos.domain.snapshot.SnapshotRepository
+import com.wealthos.identity.application.CurrentUserIdProvider
+import com.wealthos.identity.domain.UserId
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.get
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.Instant
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -41,6 +47,16 @@ class FinancialHealthControllerTest {
 
     @Autowired
     private lateinit var snapshotRepository: SnapshotRepository
+
+    @MockitoBean
+    private lateinit var currentUser: CurrentUserIdProvider
+
+    private val ownerId = UserId(UUID.fromString("a2c73231-2b53-4373-8fb3-c1681d936d6e"))
+
+    @BeforeEach
+    fun provideCurrentUser() {
+        `when`(currentUser.get()).thenReturn(ownerId)
+    }
 
     @Test
     fun `missing snapshot returns a not found problem`() {
@@ -61,7 +77,7 @@ class FinancialHealthControllerTest {
     @Test
     fun `returns calculated financial health for a snapshot`() {
         val snapshot = snapshotWithBalanceSheet()
-        snapshotRepository.save(snapshot)
+        snapshotRepository.save(ownerId, snapshot)
 
         mockMvc.get("/api/v1/financial-health/${snapshot.id.value}")
             .andExpect {
@@ -84,7 +100,7 @@ class FinancialHealthControllerTest {
     fun `returns explicit insufficient data for an empty snapshot`() {
         val asOf = Instant.parse("2026-08-01T00:00:00Z")
         val snapshot = Snapshot.capture(SnapshotId.new(), asOf, asOf)
-        snapshotRepository.save(snapshot)
+        snapshotRepository.save(ownerId, snapshot)
 
         mockMvc.get("/api/v1/financial-health/${snapshot.id.value}")
             .andExpect {

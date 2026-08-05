@@ -1,5 +1,6 @@
 package com.wealthos.configuration
 
+import com.wealthos.identity.application.CurrentUserResolver
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -14,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain
 
 @Configuration
 class ApiSecurityConfiguration(
+    private val currentUserResolver: CurrentUserResolver,
     @param:Value("\${wealthos.auth.fx-sync-client-id}")
     private val fxSyncClientId: String,
 ) {
@@ -47,7 +49,7 @@ class ApiSecurityConfiguration(
 
     private fun isHumanAccessToken(authentication: Authentication): Boolean {
         val subject = (authentication as? JwtAuthenticationToken)?.token?.subject ?: return false
-        return !subject.endsWith(AUTH0_MACHINE_SUBJECT_SUFFIX)
+        return !subject.endsWith(AUTH0_MACHINE_SUBJECT_SUFFIX) && currentUserResolver.resolve(authentication) != null
     }
 
     companion object {

@@ -3,7 +3,10 @@ package com.wealthos.snapshot.adapter.http
 import com.wealthos.fxrate.application.FxRateProvider
 import com.wealthos.fxrate.application.ProvidedFxRate
 import com.wealthos.fxrate.application.SupportedFxCurrency
+import com.wealthos.identity.application.CurrentUserIdProvider
+import com.wealthos.identity.domain.UserId
 import org.hamcrest.Matchers.matchesPattern
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +20,7 @@ import org.springframework.test.web.servlet.post
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -34,6 +38,16 @@ class SnapshotCaptureControllerTest {
 
     @MockitoBean
     private lateinit var fxRateProvider: FxRateProvider
+
+    @MockitoBean
+    private lateinit var currentUser: CurrentUserIdProvider
+
+    @BeforeEach
+    fun provideCurrentUser() {
+        `when`(currentUser.get()).thenReturn(
+            UserId(UUID.fromString("23b85363-a777-4431-b4df-a1979a415b57")),
+        )
+    }
 
     @Test
     fun `capture converts original USD money with the nearest non-future CBC rate and preserves evidence`() {
