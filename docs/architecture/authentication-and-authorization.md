@@ -42,7 +42,8 @@ Operational service ── M2M Bearer token with fx:sync ──▶ Spring operat
 5. The browser receives only an opaque session key in an HttpOnly cookie. The Auth0
    client-side access-token endpoint is disabled.
 6. A same-origin BFF route resolves the server session, obtains a current access token,
-   and calls Spring with `Authorization: Bearer ...`.
+   and calls Spring with `Authorization: Bearer ...`. The human access token must carry
+   the `wealth:access` scope.
 7. Spring validates signature, issuer, audience, expiry, and authorities, then resolves
    issuer plus subject to one local User.
 
@@ -104,6 +105,8 @@ no administrator role.
 - The in-process FX scheduler calls the synchronization use case directly.
 - An external operational tool uses Auth0 Client Credentials with a dedicated M2M client.
 - Manual synchronization requires the `fx:sync` scope and an approved machine client.
+- The Web application grant contains only `wealth:access`; the FX synchronization M2M
+  grant contains only `fx:sync`.
 - M2M credentials live only in the operational secret store.
 - An M2M token cannot read personal financial endpoints merely because it can synchronize
   reference rates.

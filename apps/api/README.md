@@ -27,8 +27,9 @@ SPRING_PROFILES_ACTIVE=local \
 ```
 
 The API fails to start without an explicit OAuth issuer and audience. Personal endpoints
-require an Auth0 user access token containing `email` and boolean `email_verified` claims;
-the verified email must match the comma-separated server allowlist. `POST
+require an Auth0 user access token containing `wealth:access`, `email`, and boolean
+`email_verified` claims; the verified email must match the comma-separated server
+allowlist. `POST
 /api/v1/fx-rates/sync` instead requires the
 configured M2M client and separate `fx:sync` machine authority. Swagger is disabled by
 default and must be explicitly enabled for local development. Never commit real tenant

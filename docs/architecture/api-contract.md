@@ -156,7 +156,8 @@ never executed or inserted as HTML. Server validation remains authoritative.
 ## Security boundary
 
 - Personal financial endpoints require an OAuth Bearer access token issued for the Wealth
-  OS user API. Missing or invalid authentication returns `401`.
+  OS user API with `wealth:access`. Missing or invalid authentication returns `401`; a
+  valid token without the required product scope returns `403`.
 - Spring derives the local User from validated issuer and subject claims. Product request
   paths, query parameters, and bodies never accept an owner identifier.
 - A valid caller requesting another owner's Asset, Liability, Snapshot, correction,

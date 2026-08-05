@@ -46,14 +46,23 @@ class ApiSecurityBoundaryTest {
     fun `authenticated user can invoke a personal financial endpoint`() {
         mockMvc.get("/api/v1/assets") {
             with(
+                userJwt("google-oauth2|person", "allowed@example.com"),
+            )
+        }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `human access token without product scope cannot invoke a personal financial endpoint`() {
+        mockMvc.get("/api/v1/assets") {
+            with(
                 jwt().jwt {
                     it.issuer("https://wealth-os-test.example/")
-                        .subject("google-oauth2|person")
+                        .subject("google-oauth2|person-without-scope")
                         .claim("email", "allowed@example.com")
                         .claim("email_verified", true)
                 },
             )
-        }.andExpect { status { isOk() } }
+        }.andExpect { status { isForbidden() } }
     }
 
     @Test
@@ -288,10 +297,11 @@ class ApiSecurityBoundaryTest {
         subject: String,
         email: String,
     ): RequestPostProcessor =
-        jwt().jwt {
-            it.issuer("https://wealth-os-test.example/")
-                .subject(subject)
-                .claim("email", email)
-                .claim("email_verified", true)
-        }
+        jwt()
+            .jwt {
+                it.issuer("https://wealth-os-test.example/")
+                    .subject(subject)
+                    .claim("email", email)
+                    .claim("email_verified", true)
+            }.authorities(SimpleGrantedAuthority("SCOPE_wealth:access"))
 }
