@@ -20,7 +20,15 @@ spring:
         jdbc:
           time_zone: UTC
 
+springdoc:
+  api-docs:
+    enabled: ${WEALTHOS_SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${WEALTHOS_SWAGGER_ENABLED:false}
+
 wealthos:
+  auth:
+    fx-sync-client-id: ${WEALTHOS_FX_SYNC_CLIENT_ID}
   fx:
     scheduling-enabled: ${WEALTHOS_FX_SCHEDULING_ENABLED:true}
     frankfurter-base-url: ${WEALTHOS_FRANKFURTER_BASE_URL:https://api.frankfurter.dev}

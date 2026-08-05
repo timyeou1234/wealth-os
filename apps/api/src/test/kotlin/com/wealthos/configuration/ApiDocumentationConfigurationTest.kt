@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.get
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=none",
+        "springdoc.api-docs.enabled=true",
+        "springdoc.swagger-ui.enabled=true",
     ],
 )
 @AutoConfigureMockMvc

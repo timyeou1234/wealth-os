@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.post
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "wealthos.auth.fx-sync-client-id=approved-operations-client",
     ],
 )
 @AutoConfigureMockMvc
@@ -43,6 +44,43 @@ class ApiSecurityBoundaryTest {
             with(jwt().jwt { it.subject("google-oauth2|person") })
             contentType = MediaType.APPLICATION_JSON
             content = """{"from":"2026-08-04","to":"2026-08-03"}"""
+        }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `human access token with an operational scope cannot invoke an operational endpoint`() {
+        mockMvc.post("/api/v1/fx-rates/sync") {
+            with(
+                jwt()
+                    .jwt { it.subject("google-oauth2|person") }
+                    .authorities(SimpleGrantedAuthority("SCOPE_fx:sync")),
+            )
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"from":"2026-08-04","to":"2026-08-03"}"""
+        }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `unapproved machine access token cannot invoke an operational endpoint`() {
+        mockMvc.post("/api/v1/fx-rates/sync") {
+            with(
+                jwt()
+                    .jwt { it.subject("unapproved-client@clients") }
+                    .authorities(SimpleGrantedAuthority("SCOPE_fx:sync")),
+            )
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"from":"2026-08-04","to":"2026-08-03"}"""
+        }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `machine access token cannot invoke a personal financial endpoint`() {
+        mockMvc.get("/api/v1/assets") {
+            with(
+                jwt()
+                    .jwt { it.subject("approved-operations-client@clients") }
+                    .authorities(SimpleGrantedAuthority("SCOPE_fx:sync")),
+            )
         }.andExpect { status { isForbidden() } }
     }
 

@@ -19,13 +19,16 @@ Run from the repository root:
 ./gradlew :apps:api:build
 WEALTHOS_AUTH_ISSUER_URI=https://YOUR_AUTH0_DOMAIN/ \
 WEALTHOS_AUTH_AUDIENCE=https://YOUR_WEALTH_OS_API_AUDIENCE \
+WEALTHOS_FX_SYNC_CLIENT_ID=YOUR_DEVELOPMENT_M2M_CLIENT_ID \
+WEALTHOS_SWAGGER_ENABLED=true \
 ./gradlew :apps:api:bootRun
 ```
 
 The API fails to start without an explicit OAuth issuer and audience. Personal endpoints
 require an Auth0 user access token. `POST /api/v1/fx-rates/sync` instead requires the
-separate `fx:sync` machine authority. Never commit real tenant identifiers, tokens, client
-secrets, or allowlist values.
+configured M2M client and separate `fx:sync` machine authority. Swagger is disabled by
+default and must be explicitly enabled for local development. Never commit real tenant
+identifiers, tokens, client secrets, or allowlist values.
 
 With the application running, its generated API documentation is available at:
 
