@@ -1,4 +1,4 @@
-package com.wealthos.adapter.persistence.liability
+package com.wealthos.liability.adapter.persistence
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

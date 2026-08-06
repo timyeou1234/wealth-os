@@ -1,8 +1,8 @@
-package com.wealthos.domain.liability
+package com.wealthos.liability.domain
 
-import com.wealthos.domain.shared.Money
-import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.shared.AppliedConversion
+import com.wealthos.domain.shared.ManualConversion
+import com.wealthos.domain.shared.Money
 import java.math.BigDecimal
 import java.time.Instant
 

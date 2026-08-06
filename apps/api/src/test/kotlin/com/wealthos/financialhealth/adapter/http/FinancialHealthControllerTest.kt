@@ -6,10 +6,10 @@ import com.wealthos.asset.domain.AssetType
 import com.wealthos.asset.domain.AssetValuation
 import com.wealthos.asset.domain.Liquidity
 import com.wealthos.asset.domain.ValuationSource
-import com.wealthos.domain.liability.Liability
-import com.wealthos.domain.liability.LiabilityBalance
-import com.wealthos.domain.liability.LiabilityId
-import com.wealthos.domain.liability.LiabilitySource
+import com.wealthos.liability.domain.Liability
+import com.wealthos.liability.domain.LiabilityBalance
+import com.wealthos.liability.domain.LiabilityId
+import com.wealthos.liability.domain.LiabilitySource
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
 import com.wealthos.domain.snapshot.Snapshot

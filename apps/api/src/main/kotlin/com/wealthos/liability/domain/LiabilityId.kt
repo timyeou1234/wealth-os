@@ -1,9 +1,11 @@
-package com.wealthos.domain.liability
+package com.wealthos.liability.domain
 
 import java.util.UUID
 
 @JvmInline
-value class LiabilityId(val value: UUID) {
+value class LiabilityId(
+    val value: UUID,
+) {
     override fun toString(): String = value.toString()
 
     companion object {

@@ -1,9 +1,9 @@
 package com.wealthos.liability.application
 
-import com.wealthos.domain.liability.Liability
-import com.wealthos.domain.liability.LiabilityId
-import com.wealthos.domain.liability.LiabilityRepository
 import com.wealthos.identity.application.CurrentUserIdProvider
+import com.wealthos.liability.domain.Liability
+import com.wealthos.liability.domain.LiabilityId
+import com.wealthos.liability.domain.LiabilityRepository
 import org.springframework.stereotype.Service
 
 @Service

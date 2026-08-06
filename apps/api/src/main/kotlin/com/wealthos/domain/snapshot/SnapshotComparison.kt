@@ -1,9 +1,9 @@
 package com.wealthos.domain.snapshot
 
 import com.wealthos.asset.domain.AssetId
-import com.wealthos.domain.liability.LiabilityId
 import com.wealthos.domain.shared.Currency
 import com.wealthos.domain.shared.Money
+import com.wealthos.liability.domain.LiabilityId
 import java.time.Instant
 
 data class SnapshotComparison(

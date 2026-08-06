@@ -1,15 +1,15 @@
-package com.wealthos.adapter.persistence.liability
+package com.wealthos.liability.adapter.persistence
 
-import com.wealthos.domain.liability.Liability
-import com.wealthos.domain.liability.LiabilityId
-import com.wealthos.domain.liability.LiabilityRepository
 import com.wealthos.identity.domain.UserId
+import com.wealthos.liability.domain.Liability
+import com.wealthos.liability.domain.LiabilityId
+import com.wealthos.liability.domain.LiabilityRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
-import kotlin.test.assertEquals
 import java.util.UUID
+import kotlin.test.assertEquals
 
 @DataJpaTest(
     properties = [
