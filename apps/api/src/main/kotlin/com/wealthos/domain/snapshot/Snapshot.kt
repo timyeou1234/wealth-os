@@ -2,9 +2,9 @@ package com.wealthos.domain.snapshot
 
 import com.wealthos.asset.domain.Asset
 import com.wealthos.asset.domain.AssetValuation
-import com.wealthos.domain.liability.Liability
-import com.wealthos.domain.liability.LiabilityBalance
 import com.wealthos.domain.shared.Currency
+import com.wealthos.liability.domain.Liability
+import com.wealthos.liability.domain.LiabilityBalance
 import java.time.Instant
 
 class Snapshot private constructor(

@@ -1,7 +1,9 @@
-package com.wealthos.domain.liability
+package com.wealthos.liability.domain
 
 @JvmInline
-value class LiabilitySource private constructor(val value: String) {
+value class LiabilitySource private constructor(
+    val value: String,
+) {
     override fun toString(): String = value
 
     companion object {

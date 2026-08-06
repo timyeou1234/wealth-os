@@ -1,7 +1,7 @@
 package com.wealthos.liability.adapter.http
 
-import com.wealthos.domain.liability.Liability
-import com.wealthos.domain.liability.LiabilityId
+import com.wealthos.liability.domain.Liability
+import com.wealthos.liability.domain.LiabilityId
 import com.wealthos.liability.application.CreateLiability
 import com.wealthos.liability.application.ArchiveLiability
 import com.wealthos.liability.application.GetLiability

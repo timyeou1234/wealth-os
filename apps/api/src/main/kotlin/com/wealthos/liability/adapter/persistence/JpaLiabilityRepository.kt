@@ -1,27 +1,26 @@
-package com.wealthos.adapter.persistence.liability
+package com.wealthos.liability.adapter.persistence
 
-import com.wealthos.domain.liability.Liability
-import com.wealthos.domain.liability.LiabilityId
-import com.wealthos.domain.liability.LiabilityRepository
 import com.wealthos.identity.domain.UserId
+import com.wealthos.liability.domain.Liability
+import com.wealthos.liability.domain.LiabilityId
+import com.wealthos.liability.domain.LiabilityRepository
 import org.springframework.stereotype.Repository
 
 @Repository
 class JpaLiabilityRepository(
-    private val repository: LiabilityJpaRepository,
+    private val jpa: LiabilityJpaRepository,
 ) : LiabilityRepository {
     override fun save(
         ownerId: UserId,
         liability: Liability,
-    ): Liability = repository.save(liability.toEntity(ownerId)).toDomain()
+    ): Liability = jpa.save(liability.toEntity(ownerId)).toDomain()
 
     override fun findById(
         ownerId: UserId,
         id: LiabilityId,
-    ): Liability? = repository.findByIdAndOwnerId(id.value, ownerId.value)?.toDomain()
+    ): Liability? = jpa.findByIdAndOwnerId(id.value, ownerId.value)?.toDomain()
 
-    override fun findAll(ownerId: UserId): List<Liability> =
-        repository.findAllByOwnerId(ownerId.value).map { it.toDomain() }
+    override fun findAll(ownerId: UserId): List<Liability> = jpa.findAllByOwnerId(ownerId.value).map { it.toDomain() }
 
     private fun Liability.toEntity(ownerId: UserId): LiabilityJpaEntity =
         LiabilityJpaEntity(

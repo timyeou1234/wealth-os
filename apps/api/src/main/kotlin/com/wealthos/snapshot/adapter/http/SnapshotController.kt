@@ -5,15 +5,15 @@ import com.wealthos.asset.domain.AssetType
 import com.wealthos.asset.domain.AssetValuation
 import com.wealthos.asset.domain.Liquidity
 import com.wealthos.asset.domain.ValuationSource
-import com.wealthos.domain.liability.LiabilityBalance
-import com.wealthos.domain.liability.LiabilityId
-import com.wealthos.domain.liability.LiabilitySource
-import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.shared.AppliedConversion
+import com.wealthos.domain.shared.ManualConversion
 import com.wealthos.domain.snapshot.Snapshot
 import com.wealthos.domain.snapshot.SnapshotId
+import com.wealthos.liability.domain.Liability
+import com.wealthos.liability.domain.LiabilityBalance
+import com.wealthos.liability.domain.LiabilityId
+import com.wealthos.liability.domain.LiabilitySource
 import com.wealthos.snapshot.application.SnapshotApplication
-import com.wealthos.snapshot.application.SnapshotNotFoundException
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -28,9 +28,9 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import java.math.BigDecimal
 import java.net.URI
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 @RestController
@@ -66,7 +66,7 @@ data class CreateSnapshotRequest(
             id = SnapshotId.new(), asOf = asOf, recordedAt = recordedAt,
             assets = assets.mapIndexed { i, a -> com.wealthos.asset.domain.Asset(assetIds[i], a.name, a.type, a.liquidity) },
             assetValuations = assets.mapIndexed { i, a -> AssetValuation(assetIds[i], a.money.toDomain("assets[$i].money"), a.effectiveAt, ValuationSource.of(a.source), a.manualConversion?.toDomain("assets[$i].manualConversion")) },
-            liabilities = liabilities.mapIndexed { i, l -> com.wealthos.domain.liability.Liability(liabilityIds[i], l.name) },
+            liabilities = liabilities.mapIndexed { i, l -> Liability(liabilityIds[i], l.name) },
             liabilityBalances = liabilities.mapIndexed { i, l -> LiabilityBalance(liabilityIds[i], l.money.toDomain("liabilities[$i].money"), l.effectiveAt, LiabilitySource.of(l.source), l.manualConversion?.toDomain("liabilities[$i].manualConversion")) },
         )
     }
@@ -145,7 +145,7 @@ data class ManualConversionResponse(val originalMoney: MoneyResponse, val exchan
 data class AppliedConversionResponse(
     val originalMoney: MoneyResponse,
     @field:Schema(example = "32.292") val rate: String,
-    @field:Schema(example = "2026-07-31") val rateDate: java.time.LocalDate,
+    @field:Schema(example = "2026-07-31") val rateDate: LocalDate,
     @field:Schema(example = "CBC") val provider: String,
     @field:Schema(example = "REFERENCE_RATE") val rateType: String,
     val basis: String?,

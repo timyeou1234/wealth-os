@@ -1,4 +1,4 @@
-package com.wealthos.domain.liability
+package com.wealthos.liability.domain
 
 class Liability(
     val id: LiabilityId,
